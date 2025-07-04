@@ -1,0 +1,120 @@
+{
+  "source": "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Connection Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 118
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 32
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "WordPress Site",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 47
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create an Application Password in your WordPress admin under Users → Profile",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "WordPress.com authentication coming soon",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "Site URL",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 48
+        }
+      },
+      {
+        "comment": "",
+        "key": "WordPress.com site",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "Username",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "Application Password",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connect",
+        "location": {
+          "startingColumn": 57,
+          "startingLine": 95
+        }
+      },
+      {
+        "comment": "",
+        "key": "Update Connection",
+        "location": {
+          "startingColumn": 69,
+          "startingLine": 95
+        }
+      },
+      {
+        "comment": "",
+        "key": "Disconnect Site",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 119
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,16 @@
+{
+  "source": "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill/BlockEditorDemo.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Block Editor Demo",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 10
+        }
+      }
+    ]
+  },
+  "version": 1
+}

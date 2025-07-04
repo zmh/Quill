@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild:*)",
+      "Bash(open:*)",
+      "Bash(swift build)",
+      "Bash(find:*)",
+      "Bash(sudo xcode-select:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(swift -typecheck:*)",
+      "Bash(swiftc:*)",
+      "Bash(sed:*)",
+      "Bash(log show:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": false
+}

@@ -1,0 +1,216 @@
+{
+  "source": "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sync Error",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 36
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "Select a post to edit",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 48
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 57
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 165
+        }
+      },
+      {
+        "comment": "",
+        "key": "Search posts",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 158
+        }
+      },
+      {
+        "comment": "",
+        "key": "All",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 166
+        }
+      },
+      {
+        "comment": "",
+        "key": "Refresh",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Post",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 211
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld words",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 270
+        }
+      },
+      {
+        "comment": "",
+        "key": "Title",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 288
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld words",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 304
+        }
+      },
+      {
+        "comment": "",
+        "key": "Publish",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 318
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Post",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 356
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 361
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 366
+        }
+      },
+      {
+        "comment": "",
+        "key": "What would you like to say?",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 383
+        }
+      },
+      {
+        "comment": "",
+        "key": "First line becomes the title",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 393
+        }
+      },
+      {
+        "comment": "",
+        "key": "Post Details",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 411
+        }
+      },
+      {
+        "comment": "",
+        "key": "Statistics",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 430
+        }
+      },
+      {
+        "comment": "",
+        "key": "Title",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 412
+        }
+      },
+      {
+        "comment": "",
+        "key": "Slug",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 413
+        }
+      },
+      {
+        "comment": "",
+        "key": "Status",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 415
+        }
+      },
+      {
+        "comment": "",
+        "key": "Publish Date",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 422
+        }
+      },
+      {
+        "comment": "",
+        "key": "Words",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 431
+        }
+      }
+    ]
+  },
+  "version": 1
+}

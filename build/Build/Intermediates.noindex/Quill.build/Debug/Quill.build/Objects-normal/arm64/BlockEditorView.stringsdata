@@ -1,0 +1,136 @@
+{
+  "source": "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill/BlockEditorView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Keyboard Shortcuts",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Block",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "⌘+Space: Add Block",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 31
+        }
+      },
+      {
+        "comment": "",
+        "key": "⌘+Return: New Paragraph",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 32
+        }
+      },
+      {
+        "comment": "",
+        "key": "⌘+Backspace: Delete Block",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 33
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start Writing",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add your first block to begin",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 97
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Paragraph",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 107
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Block",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 161
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add Block",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "Common Blocks",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 302
+        }
+      },
+      {
+        "comment": "",
+        "key": "Layout",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 308
+        }
+      },
+      {
+        "comment": "",
+        "key": "Media",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 314
+        }
+      },
+      {
+        "comment": "",
+        "key": "Design",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 320
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 332
+        }
+      },
+      {
+        "comment": "",
+        "key": "Block Editor",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 459
+        }
+      }
+    ]
+  },
+  "version": 1
+}
