@@ -323,6 +323,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.blocksContainer = document.createElement('div');
                         this.blocksContainer.className = 'block-editor-writing-flow';
                         this.blocksContainer.style.minHeight = '200px';
+                        this.blocksContainer.contentEditable = true;
+                        this.blocksContainer.style.outline = 'none';
                         
                         this.container.appendChild(this.blocksContainer);
                         
@@ -333,8 +335,233 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.handlingBackspace = false;
                         this.justHidSlashCommands = false;
                         
+                        // Add unified event listeners to blocks container
+                        this.setupContainerEventListeners();
+                        
                         // Setup mutation observer for height changes
                         this.setupHeightObserver();
+                    }
+                    
+                    setupContainerEventListeners() {
+                        // Handle input events at container level
+                        this.blocksContainer.addEventListener('input', (e) => {
+                            // First check if the DOM structure has been altered (multi-block edit)
+                            if (this.needsBlockStructureSync()) {
+                                this.syncBlocksFromDOM();
+                            } else {
+                                const blockElement = this.findBlockElementFromEvent(e);
+                                if (blockElement) {
+                                    const blockId = blockElement.getAttribute('data-block-id');
+                                    const block = this.blocks.find(b => b.id === blockId);
+                                    if (block) {
+                                        window.webkit.messageHandlers.editorError.postMessage(`INPUT event: text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
+                                        this.handleBlockInput(e, block);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // Handle keydown events at container level
+                        this.blocksContainer.addEventListener('keydown', (e) => {
+                            const blockElement = this.findBlockElementFromEvent(e);
+                            if (blockElement) {
+                                const blockIndex = parseInt(blockElement.getAttribute('data-block-index'));
+                                window.webkit.messageHandlers.editorError.postMessage(`KEYDOWN event: key="${e.key}", text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
+                                this.handleKeyDown(e, blockIndex);
+                            }
+                        });
+                        
+                        // Handle selection changes to update current block
+                        document.addEventListener('selectionchange', () => {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                const blockElement = this.findBlockElementFromNode(range.startContainer);
+                                if (blockElement) {
+                                    const blockId = blockElement.getAttribute('data-block-id');
+                                    this.setCurrentBlock(blockId);
+                                }
+                            }
+                        });
+                    }
+                    
+                    findBlockElementFromEvent(event) {
+                        let element = event.target;
+                        while (element && !element.classList.contains('wp-block')) {
+                            element = element.parentElement;
+                        }
+                        return element;
+                    }
+                    
+                    findBlockElementFromNode(node) {
+                        let element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+                        while (element && !element.classList.contains('wp-block')) {
+                            element = element.parentElement;
+                        }
+                        return element;
+                    }
+                    
+                    needsBlockStructureSync() {
+                        // Check if the number of block elements in DOM matches our internal blocks array
+                        const domBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        return domBlocks.length !== this.blocks.length;
+                    }
+                    
+                    syncBlocksFromDOM() {
+                        window.webkit.messageHandlers.editorError.postMessage('Syncing blocks from DOM due to structure change');
+                        
+                        // Save current selection/cursor position
+                        const selection = window.getSelection();
+                        let cursorInfo = null;
+                        
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            const blockElement = this.findBlockElementFromNode(range.startContainer);
+                            
+                            if (blockElement) {
+                                const blockIndex = Array.from(this.blocksContainer.children).indexOf(blockElement);
+                                const contentElement = blockElement.querySelector('.wp-block-content');
+                                
+                                if (contentElement) {
+                                    // Calculate offset within the block
+                                    const preCaretRange = range.cloneRange();
+                                    preCaretRange.selectNodeContents(contentElement);
+                                    preCaretRange.setEnd(range.endContainer, range.endOffset);
+                                    const offset = preCaretRange.toString().length;
+                                    
+                                    cursorInfo = {
+                                        blockIndex: blockIndex,
+                                        offset: offset,
+                                        collapsed: range.collapsed
+                                    };
+                                }
+                            }
+                        }
+                        
+                        const domBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        const newBlocks = [];
+                        
+                        domBlocks.forEach((blockElement, index) => {
+                            const contentElement = blockElement.querySelector('.wp-block-content');
+                            if (contentElement) {
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                const existingBlock = this.blocks.find(b => b.id === blockId);
+                                
+                                if (existingBlock) {
+                                    // Update existing block with current content
+                                    existingBlock.content = contentElement.innerHTML;
+                                    newBlocks.push(existingBlock);
+                                } else {
+                                    // Create new block from DOM element
+                                    const tagName = contentElement.tagName.toLowerCase();
+                                    let blockType = 'paragraph';
+                                    
+                                    // Determine block type from tag
+                                    switch (tagName) {
+                                        case 'h1': blockType = 'heading-1'; break;
+                                        case 'h2': blockType = 'heading-2'; break;
+                                        case 'h3': blockType = 'heading-3'; break;
+                                        case 'pre': blockType = 'code'; break;
+                                        case 'blockquote': blockType = 'quote'; break;
+                                        case 'ul': blockType = 'list'; break;
+                                        case 'ol': blockType = 'ordered-list'; break;
+                                    }
+                                    
+                                    newBlocks.push({
+                                        id: this.generateBlockId(),
+                                        type: blockType,
+                                        content: contentElement.innerHTML,
+                                        attributes: {}
+                                    });
+                                }
+                            }
+                        });
+                        
+                        // Update internal blocks array
+                        this.blocks = newBlocks;
+                        
+                        // Instead of full re-render, just update block attributes
+                        this.updateBlockAttributes();
+                        
+                        // Restore cursor position if we had one
+                        if (cursorInfo && cursorInfo.blockIndex < this.blocksContainer.children.length) {
+                            const blockElement = this.blocksContainer.children[cursorInfo.blockIndex];
+                            const contentElement = blockElement.querySelector('.wp-block-content');
+                            
+                            if (contentElement) {
+                                // Focus the container first
+                                this.blocksContainer.focus();
+                                
+                                // Set cursor at the saved position
+                                const textNode = this.getTextNodeAtOffset(contentElement, cursorInfo.offset);
+                                if (textNode.node) {
+                                    const range = document.createRange();
+                                    range.setStart(textNode.node, textNode.offset);
+                                    range.collapse(true);
+                                    
+                                    const sel = window.getSelection();
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                }
+                            }
+                        }
+                        
+                        // Notify of content change
+                        this.handleContentChange();
+                    }
+                    
+                    getTextNodeAtOffset(element, offset) {
+                        let currentOffset = 0;
+                        let targetNode = null;
+                        let targetOffset = 0;
+                        
+                        const walk = (node) => {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                const length = node.textContent.length;
+                                if (currentOffset + length >= offset) {
+                                    targetNode = node;
+                                    targetOffset = offset - currentOffset;
+                                    return true;
+                                }
+                                currentOffset += length;
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                for (let child of node.childNodes) {
+                                    if (walk(child)) return true;
+                                }
+                            }
+                            return false;
+                        };
+                        
+                        walk(element);
+                        
+                        // If we didn't find a text node, try to use the last available position
+                        if (!targetNode && element.lastChild) {
+                            if (element.lastChild.nodeType === Node.TEXT_NODE) {
+                                targetNode = element.lastChild;
+                                targetOffset = element.lastChild.textContent.length;
+                            } else {
+                                // Create a text node if needed
+                                targetNode = document.createTextNode('');
+                                element.appendChild(targetNode);
+                                targetOffset = 0;
+                            }
+                        }
+                        
+                        return { node: targetNode, offset: targetOffset };
+                    }
+                    
+                    updateBlockAttributes() {
+                        // Update block attributes without re-rendering
+                        const domBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        
+                        domBlocks.forEach((blockElement, index) => {
+                            if (index < this.blocks.length) {
+                                const block = this.blocks[index];
+                                blockElement.setAttribute('data-block-id', block.id);
+                                blockElement.setAttribute('data-block-index', index);
+                                blockElement.setAttribute('data-block-type', block.type);
+                            }
+                        });
                     }
                     
                     parseContent() {
@@ -505,7 +732,6 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     
                     createContentElement(block) {
                         const element = document.createElement(this.getBlockTagName(block.type));
-                        element.contentEditable = true;
                         element.className = 'wp-block-content';
                         element.style.outline = 'none';
                         
@@ -513,36 +739,20 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         if (block.type === 'list' || block.type === 'ordered-list') {
                             element.innerHTML = block.content || '<li></li>';
                             
-                            // Focus the first list item when the list is focused
-                            element.addEventListener('focus', () => {
-                                const firstLi = element.querySelector('li');
-                                if (firstLi) {
-                                    const range = document.createRange();
-                                    const selection = window.getSelection();
-                                    range.selectNodeContents(firstLi);
-                                    range.collapse(false);
-                                    selection.removeAllRanges();
-                                    selection.addRange(range);
-                                }
+                            // List-specific setup for first item focus
+                            if (block.type === 'list' || block.type === 'ordered-list') {
+                                // Focus handling is now managed at container level
                                 this.setCurrentBlock(block.id);
-                            });
+                            }
                         } else {
                             element.innerHTML = block.content || '';
-                            element.addEventListener('focus', () => this.setCurrentBlock(block.id));
+                            // Focus handling is now managed at container level
                         }
                         
                         // Apply block-specific attributes
                         this.applyBlockAttributes(element, block);
                         
-                        // Add event listeners
-                        element.addEventListener('input', (e) => {
-                            window.webkit.messageHandlers.editorError.postMessage(`INPUT event: text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
-                            this.handleBlockInput(e, block);
-                        });
-                        element.addEventListener('keydown', (e) => {
-                            window.webkit.messageHandlers.editorError.postMessage(`KEYDOWN event: key="${e.key}", text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
-                            this.handleKeyDown(e, this.getBlockIndex(block.id));
-                        });
+                        // Individual block event listeners are now handled at container level
                         
                         return element;
                     }
@@ -596,7 +806,14 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     
                     handleBlockInput(event, block) {
                         const blockIndex = this.getBlockIndex(block.id);
-                        const content = event.target.innerHTML;
+                        
+                        // Find the block content element
+                        const blockElement = this.findBlockElementFromEvent(event);
+                        const contentElement = blockElement ? blockElement.querySelector('.wp-block-content') : null;
+                        
+                        if (!contentElement) return;
+                        
+                        const content = contentElement.innerHTML;
                         
                         // Update block content
                         this.blocks[blockIndex].content = content;
@@ -609,7 +826,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         }
                         
                         // Handle slash commands
-                        const text = event.target.innerText;
+                        const text = contentElement.innerText;
                         if (text.startsWith('/')) {
                             if (text.length === 1) {
                                 // Show slash commands when text is exactly '/'
@@ -639,8 +856,9 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             const blockElement = this.blocksContainer.children[index];
                             const contentElement = blockElement.querySelector('.wp-block-content');
                             if (contentElement) {
-                                contentElement.focus();
-                                // Place cursor at end
+                                // Focus the container first
+                                this.blocksContainer.focus();
+                                // Place cursor at end of the block
                                 const range = document.createRange();
                                 const sel = window.getSelection();
                                 range.selectNodeContents(contentElement);
@@ -1586,6 +1804,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.blocksContainer = document.createElement('div');
                         this.blocksContainer.className = 'block-editor-writing-flow';
                         this.blocksContainer.style.minHeight = '200px';
+                        this.blocksContainer.contentEditable = true;
+                        this.blocksContainer.style.outline = 'none';
                         
                         this.container.appendChild(this.blocksContainer);
                         
@@ -1596,8 +1816,233 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.handlingBackspace = false;
                         this.justHidSlashCommands = false;
                         
+                        // Add unified event listeners to blocks container
+                        this.setupContainerEventListeners();
+                        
                         // Setup mutation observer for height changes
                         this.setupHeightObserver();
+                    }
+                    
+                    setupContainerEventListeners() {
+                        // Handle input events at container level
+                        this.blocksContainer.addEventListener('input', (e) => {
+                            // First check if the DOM structure has been altered (multi-block edit)
+                            if (this.needsBlockStructureSync()) {
+                                this.syncBlocksFromDOM();
+                            } else {
+                                const blockElement = this.findBlockElementFromEvent(e);
+                                if (blockElement) {
+                                    const blockId = blockElement.getAttribute('data-block-id');
+                                    const block = this.blocks.find(b => b.id === blockId);
+                                    if (block) {
+                                        window.webkit.messageHandlers.editorError.postMessage(`INPUT event: text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
+                                        this.handleBlockInput(e, block);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // Handle keydown events at container level
+                        this.blocksContainer.addEventListener('keydown', (e) => {
+                            const blockElement = this.findBlockElementFromEvent(e);
+                            if (blockElement) {
+                                const blockIndex = parseInt(blockElement.getAttribute('data-block-index'));
+                                window.webkit.messageHandlers.editorError.postMessage(`KEYDOWN event: key="${e.key}", text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
+                                this.handleKeyDown(e, blockIndex);
+                            }
+                        });
+                        
+                        // Handle selection changes to update current block
+                        document.addEventListener('selectionchange', () => {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                const blockElement = this.findBlockElementFromNode(range.startContainer);
+                                if (blockElement) {
+                                    const blockId = blockElement.getAttribute('data-block-id');
+                                    this.setCurrentBlock(blockId);
+                                }
+                            }
+                        });
+                    }
+                    
+                    findBlockElementFromEvent(event) {
+                        let element = event.target;
+                        while (element && !element.classList.contains('wp-block')) {
+                            element = element.parentElement;
+                        }
+                        return element;
+                    }
+                    
+                    findBlockElementFromNode(node) {
+                        let element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+                        while (element && !element.classList.contains('wp-block')) {
+                            element = element.parentElement;
+                        }
+                        return element;
+                    }
+                    
+                    needsBlockStructureSync() {
+                        // Check if the number of block elements in DOM matches our internal blocks array
+                        const domBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        return domBlocks.length !== this.blocks.length;
+                    }
+                    
+                    syncBlocksFromDOM() {
+                        window.webkit.messageHandlers.editorError.postMessage('Syncing blocks from DOM due to structure change');
+                        
+                        // Save current selection/cursor position
+                        const selection = window.getSelection();
+                        let cursorInfo = null;
+                        
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            const blockElement = this.findBlockElementFromNode(range.startContainer);
+                            
+                            if (blockElement) {
+                                const blockIndex = Array.from(this.blocksContainer.children).indexOf(blockElement);
+                                const contentElement = blockElement.querySelector('.wp-block-content');
+                                
+                                if (contentElement) {
+                                    // Calculate offset within the block
+                                    const preCaretRange = range.cloneRange();
+                                    preCaretRange.selectNodeContents(contentElement);
+                                    preCaretRange.setEnd(range.endContainer, range.endOffset);
+                                    const offset = preCaretRange.toString().length;
+                                    
+                                    cursorInfo = {
+                                        blockIndex: blockIndex,
+                                        offset: offset,
+                                        collapsed: range.collapsed
+                                    };
+                                }
+                            }
+                        }
+                        
+                        const domBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        const newBlocks = [];
+                        
+                        domBlocks.forEach((blockElement, index) => {
+                            const contentElement = blockElement.querySelector('.wp-block-content');
+                            if (contentElement) {
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                const existingBlock = this.blocks.find(b => b.id === blockId);
+                                
+                                if (existingBlock) {
+                                    // Update existing block with current content
+                                    existingBlock.content = contentElement.innerHTML;
+                                    newBlocks.push(existingBlock);
+                                } else {
+                                    // Create new block from DOM element
+                                    const tagName = contentElement.tagName.toLowerCase();
+                                    let blockType = 'paragraph';
+                                    
+                                    // Determine block type from tag
+                                    switch (tagName) {
+                                        case 'h1': blockType = 'heading-1'; break;
+                                        case 'h2': blockType = 'heading-2'; break;
+                                        case 'h3': blockType = 'heading-3'; break;
+                                        case 'pre': blockType = 'code'; break;
+                                        case 'blockquote': blockType = 'quote'; break;
+                                        case 'ul': blockType = 'list'; break;
+                                        case 'ol': blockType = 'ordered-list'; break;
+                                    }
+                                    
+                                    newBlocks.push({
+                                        id: this.generateBlockId(),
+                                        type: blockType,
+                                        content: contentElement.innerHTML,
+                                        attributes: {}
+                                    });
+                                }
+                            }
+                        });
+                        
+                        // Update internal blocks array
+                        this.blocks = newBlocks;
+                        
+                        // Instead of full re-render, just update block attributes
+                        this.updateBlockAttributes();
+                        
+                        // Restore cursor position if we had one
+                        if (cursorInfo && cursorInfo.blockIndex < this.blocksContainer.children.length) {
+                            const blockElement = this.blocksContainer.children[cursorInfo.blockIndex];
+                            const contentElement = blockElement.querySelector('.wp-block-content');
+                            
+                            if (contentElement) {
+                                // Focus the container first
+                                this.blocksContainer.focus();
+                                
+                                // Set cursor at the saved position
+                                const textNode = this.getTextNodeAtOffset(contentElement, cursorInfo.offset);
+                                if (textNode.node) {
+                                    const range = document.createRange();
+                                    range.setStart(textNode.node, textNode.offset);
+                                    range.collapse(true);
+                                    
+                                    const sel = window.getSelection();
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                }
+                            }
+                        }
+                        
+                        // Notify of content change
+                        this.handleContentChange();
+                    }
+                    
+                    getTextNodeAtOffset(element, offset) {
+                        let currentOffset = 0;
+                        let targetNode = null;
+                        let targetOffset = 0;
+                        
+                        const walk = (node) => {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                const length = node.textContent.length;
+                                if (currentOffset + length >= offset) {
+                                    targetNode = node;
+                                    targetOffset = offset - currentOffset;
+                                    return true;
+                                }
+                                currentOffset += length;
+                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                for (let child of node.childNodes) {
+                                    if (walk(child)) return true;
+                                }
+                            }
+                            return false;
+                        };
+                        
+                        walk(element);
+                        
+                        // If we didn't find a text node, try to use the last available position
+                        if (!targetNode && element.lastChild) {
+                            if (element.lastChild.nodeType === Node.TEXT_NODE) {
+                                targetNode = element.lastChild;
+                                targetOffset = element.lastChild.textContent.length;
+                            } else {
+                                // Create a text node if needed
+                                targetNode = document.createTextNode('');
+                                element.appendChild(targetNode);
+                                targetOffset = 0;
+                            }
+                        }
+                        
+                        return { node: targetNode, offset: targetOffset };
+                    }
+                    
+                    updateBlockAttributes() {
+                        // Update block attributes without re-rendering
+                        const domBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        
+                        domBlocks.forEach((blockElement, index) => {
+                            if (index < this.blocks.length) {
+                                const block = this.blocks[index];
+                                blockElement.setAttribute('data-block-id', block.id);
+                                blockElement.setAttribute('data-block-index', index);
+                                blockElement.setAttribute('data-block-type', block.type);
+                            }
+                        });
                     }
                     
                     parseContent() {
@@ -1680,7 +2125,6 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     
                     createContentElement(block) {
                         const element = document.createElement(this.getBlockTagName(block.type));
-                        element.contentEditable = true;
                         element.className = 'wp-block-content';
                         element.style.outline = 'none';
                         
@@ -1688,36 +2132,20 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         if (block.type === 'list' || block.type === 'ordered-list') {
                             element.innerHTML = block.content || '<li></li>';
                             
-                            // Focus the first list item when the list is focused
-                            element.addEventListener('focus', () => {
-                                const firstLi = element.querySelector('li');
-                                if (firstLi) {
-                                    const range = document.createRange();
-                                    const selection = window.getSelection();
-                                    range.selectNodeContents(firstLi);
-                                    range.collapse(false);
-                                    selection.removeAllRanges();
-                                    selection.addRange(range);
-                                }
+                            // List-specific setup for first item focus
+                            if (block.type === 'list' || block.type === 'ordered-list') {
+                                // Focus handling is now managed at container level
                                 this.setCurrentBlock(block.id);
-                            });
+                            }
                         } else {
                             element.innerHTML = block.content || '';
-                            element.addEventListener('focus', () => this.setCurrentBlock(block.id));
+                            // Focus handling is now managed at container level
                         }
                         
                         // Apply block-specific attributes
                         this.applyBlockAttributes(element, block);
                         
-                        // Add event listeners
-                        element.addEventListener('input', (e) => {
-                            window.webkit.messageHandlers.editorError.postMessage(`INPUT event: text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
-                            this.handleBlockInput(e, block);
-                        });
-                        element.addEventListener('keydown', (e) => {
-                            window.webkit.messageHandlers.editorError.postMessage(`KEYDOWN event: key="${e.key}", text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
-                            this.handleKeyDown(e, this.getBlockIndex(block.id));
-                        });
+                        // Individual block event listeners are now handled at container level
                         
                         return element;
                     }
@@ -1771,7 +2199,14 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     
                     handleBlockInput(event, block) {
                         const blockIndex = this.getBlockIndex(block.id);
-                        const content = event.target.innerHTML;
+                        
+                        // Find the block content element
+                        const blockElement = this.findBlockElementFromEvent(event);
+                        const contentElement = blockElement ? blockElement.querySelector('.wp-block-content') : null;
+                        
+                        if (!contentElement) return;
+                        
+                        const content = contentElement.innerHTML;
                         
                         // Update block content
                         this.blocks[blockIndex].content = content;
@@ -1784,7 +2219,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         }
                         
                         // Handle slash commands
-                        const text = event.target.innerText;
+                        const text = contentElement.innerText;
                         if (text.startsWith('/')) {
                             if (text.length === 1) {
                                 // Show slash commands when text is exactly '/'
@@ -1814,8 +2249,9 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             const blockElement = this.blocksContainer.children[index];
                             const contentElement = blockElement.querySelector('.wp-block-content');
                             if (contentElement) {
-                                contentElement.focus();
-                                // Place cursor at end
+                                // Focus the container first
+                                this.blocksContainer.focus();
+                                // Place cursor at end of the block
                                 const range = document.createRange();
                                 const sel = window.getSelection();
                                 range.selectNodeContents(contentElement);
