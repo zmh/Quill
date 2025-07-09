@@ -109,6 +109,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
+        webView.uiDelegate = coordinator
         webView.scrollView.isScrollEnabled = true
         webView.isOpaque = false
         webView.backgroundColor = .systemBackground
@@ -498,11 +499,6 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         const contentElement = this.createContentElement(block);
                         blockElement.appendChild(contentElement);
                         
-                        // Add context menu
-                        blockElement.addEventListener('contextmenu', (e) => {
-                            e.preventDefault();
-                            this.showBlockContextMenu(e, index);
-                        });
                         
                         return blockElement;
                     }
@@ -919,70 +915,6 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         });
                     }
                     
-                    // Block Context Menu
-                    showBlockContextMenu(event, blockIndex) {
-                        const contextMenu = document.createElement('div');
-                        contextMenu.className = 'block-context-menu';
-                        contextMenu.style.cssText = `
-                            position: absolute;
-                            background: white;
-                            border: 1px solid #ddd;
-                            border-radius: 6px;
-                            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                            padding: 8px 0;
-                            z-index: 1000;
-                            min-width: 150px;
-                        `;
-                        
-                        const menuItems = [
-                            { label: 'Move Up', action: () => this.moveBlockUp(blockIndex), disabled: blockIndex === 0 },
-                            { label: 'Move Down', action: () => this.moveBlockDown(blockIndex), disabled: blockIndex === this.blocks.length - 1 },
-                            { label: 'Delete Block', action: () => this.deleteBlock(blockIndex), disabled: this.blocks.length === 1 },
-                            { label: 'Duplicate', action: () => this.duplicateBlock(blockIndex) }
-                        ];
-                        
-                        menuItems.forEach(item => {
-                            const menuItem = document.createElement('div');
-                            menuItem.textContent = item.label;
-                            menuItem.style.cssText = `
-                                padding: 8px 16px;
-                                cursor: pointer;
-                                color: ${item.disabled ? '#ccc' : '#333'};
-                                pointer-events: ${item.disabled ? 'none' : 'auto'};
-                            `;
-                            
-                            if (!item.disabled) {
-                                menuItem.addEventListener('click', () => {
-                                    item.action();
-                                    document.body.removeChild(contextMenu);
-                                });
-                                
-                                menuItem.addEventListener('mouseover', () => {
-                                    menuItem.style.backgroundColor = '#f5f5f5';
-                                });
-                                
-                                menuItem.addEventListener('mouseout', () => {
-                                    menuItem.style.backgroundColor = 'transparent';
-                                });
-                            }
-                            
-                            contextMenu.appendChild(menuItem);
-                        });
-                        
-                        contextMenu.style.left = event.pageX + 'px';
-                        contextMenu.style.top = event.pageY + 'px';
-                        
-                        document.body.appendChild(contextMenu);
-                        
-                        // Close on click outside
-                        const closeHandler = (e) => {
-                            if (!contextMenu.contains(e.target)) {
-                                document.body.removeChild(contextMenu);
-                                document.removeEventListener('click', closeHandler);
-                            }
-                        };
-                        setTimeout(() => document.addEventListener('click', closeHandler), 0);
-                    }
                     
                     moveBlockUp(blockIndex) {
                         if (blockIndex > 0) {
@@ -1158,7 +1090,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         """
     }
     
-    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
         
@@ -1248,10 +1180,170 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             // Execute script (would need web view reference)
             // This is a simplified approach - full implementation would need proper web view access
         }
+        
+        // MARK: - Native Context Menu Support
+        
+        @available(iOS 13.0, *)
+        func webView(_ webView: WKWebView, contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo, completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
+            
+            // Check if we're right-clicking on a block element
+            webView.evaluateJavaScript("document.elementFromPoint(\(elementInfo.boundingRect.midX), \(elementInfo.boundingRect.midY))?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
+                guard let blockIndexString = result as? String,
+                      let blockIndex = Int(blockIndexString) else {
+                    completionHandler(nil)
+                    return
+                }
+                
+                // Get total blocks count
+                webView.evaluateJavaScript("window.gutenbergEditor?.blocks?.length || 0") { blocksCountResult, _ in
+                    let blocksCount = blocksCountResult as? Int ?? 0
+                    
+                    DispatchQueue.main.async {
+                        let configuration = UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+                            var actions: [UIAction] = []
+                            
+                            // Move Up
+                            if blockIndex > 0 {
+                                let moveUpAction = UIAction(title: "Move Up", image: UIImage(systemName: "arrow.up")) { _ in
+                                    self.executeBlockAction("moveBlockUp", blockIndex: blockIndex)
+                                }
+                                actions.append(moveUpAction)
+                            }
+                            
+                            // Move Down
+                            if blockIndex < blocksCount - 1 {
+                                let moveDownAction = UIAction(title: "Move Down", image: UIImage(systemName: "arrow.down")) { _ in
+                                    self.executeBlockAction("moveBlockDown", blockIndex: blockIndex)
+                                }
+                                actions.append(moveDownAction)
+                            }
+                            
+                            // Delete Block
+                            if blocksCount > 1 {
+                                let deleteAction = UIAction(title: "Delete Block", image: UIImage(systemName: "trash"), attributes: .destructive) { _ in
+                                    self.executeBlockAction("deleteBlock", blockIndex: blockIndex)
+                                }
+                                actions.append(deleteAction)
+                            }
+                            
+                            // Duplicate
+                            let duplicateAction = UIAction(title: "Duplicate", image: UIImage(systemName: "doc.on.doc")) { _ in
+                                self.executeBlockAction("duplicateBlock", blockIndex: blockIndex)
+                            }
+                            actions.append(duplicateAction)
+                            
+                            return UIMenu(title: "", children: actions)
+                        }
+                        
+                        completionHandler(configuration)
+                    }
+                }
+            }
+        }
+        
+        private func executeBlockAction(_ action: String, blockIndex: Int) {
+            // Get the webView from the parent's webViewRef
+            guard let webView = parent.webViewRef else { return }
+            
+            let script = "window.gutenbergEditor?.\(action)(\(blockIndex))"
+            webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to execute block action \(action): \(error)", level: .error, source: "WebView")
+                }
+            }
+        }
     }
 }
 
 #elseif os(macOS)
+
+// Custom WKWebView subclass to handle context menu
+class GutenbergWKWebView: WKWebView {
+    weak var coordinator: GutenbergWebViewRepresentable.Coordinator?
+    
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        
+        // Filter out unwanted menu items
+        let itemsToRemove = menu.items.filter { item in
+            let title = item.title.lowercased()
+            let identifier = item.identifier?.rawValue ?? ""
+            
+            // Items to hide based on title or identifier
+            return title.contains("transformation") ||
+                   title.contains("paragraph direction") ||
+                   title.contains("selection direction") ||
+                   title.contains("share") ||
+                   title.contains("auto-fill") ||
+                   title.contains("autofill") ||
+                   title.contains("services") ||
+                   title.contains("look up") ||
+                   title.contains("translate") ||
+                   title.contains("search with") ||
+                   identifier.contains("WKMenuItemIdentifierLookUp") ||
+                   identifier.contains("WKMenuItemIdentifierTranslate") ||
+                   identifier.contains("WKMenuItemIdentifierSearchWeb") ||
+                   identifier.contains("WKMenuItemIdentifierShareMenu") ||
+                   identifier.contains("WKMenuItemIdentifierServices")
+        }
+        
+        // Remove the unwanted items
+        for item in itemsToRemove {
+            menu.removeItem(item)
+        }
+        
+        guard let coordinator = coordinator else { return }
+        
+        // Get the click location
+        let locationInView = convert(event.locationInWindow, from: nil)
+        
+        // Check if we're right-clicking on a block element
+        evaluateJavaScript("document.elementFromPoint(\(locationInView.x), \(locationInView.y))?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
+            guard let blockIndexString = result as? String,
+                  let blockIndex = Int(blockIndexString) else {
+                return
+            }
+            
+            // Get total blocks count
+            self.evaluateJavaScript("window.gutenbergEditor?.blocks?.length || 0") { blocksCountResult, _ in
+                let blocksCount = blocksCountResult as? Int ?? 0
+                
+                DispatchQueue.main.async {
+                    // Add separator
+                    menu.addItem(NSMenuItem.separator())
+                    
+                    // Move Up
+                    let moveUpItem = NSMenuItem(title: "Move Up", action: #selector(coordinator.moveBlockUp), keyEquivalent: "")
+                    moveUpItem.target = coordinator
+                    moveUpItem.representedObject = blockIndex
+                    moveUpItem.isEnabled = blockIndex > 0
+                    menu.addItem(moveUpItem)
+                    
+                    // Move Down
+                    let moveDownItem = NSMenuItem(title: "Move Down", action: #selector(coordinator.moveBlockDown), keyEquivalent: "")
+                    moveDownItem.target = coordinator
+                    moveDownItem.representedObject = blockIndex
+                    moveDownItem.isEnabled = blockIndex < blocksCount - 1
+                    menu.addItem(moveDownItem)
+                    
+                    // Delete Block
+                    let deleteItem = NSMenuItem(title: "Delete Block", action: #selector(coordinator.deleteBlock), keyEquivalent: "")
+                    deleteItem.target = coordinator
+                    deleteItem.representedObject = blockIndex
+                    deleteItem.isEnabled = blocksCount > 1
+                    menu.addItem(deleteItem)
+                    
+                    // Duplicate
+                    let duplicateItem = NSMenuItem(title: "Duplicate", action: #selector(coordinator.duplicateBlock), keyEquivalent: "")
+                    duplicateItem.target = coordinator
+                    duplicateItem.representedObject = blockIndex
+                    menu.addItem(duplicateItem)
+                }
+            }
+        }
+    }
+}
+
 struct GutenbergWebViewRepresentable: NSViewRepresentable {
     @Bindable var post: Post
     let typeface: String
@@ -1263,7 +1355,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
     @Binding var errorMessage: String
     @Binding var webViewRef: WKWebView?
     
-    func makeNSView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> GutenbergWKWebView {
         let coordinator = context.coordinator
         
         // Configure web view
@@ -1273,8 +1365,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         configuration.userContentController.add(coordinator, name: "editorReady")
         configuration.userContentController.add(coordinator, name: "editorError")
         
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = GutenbergWKWebView(frame: .zero, configuration: configuration)
+        webView.coordinator = coordinator
         webView.navigationDelegate = coordinator
+        webView.uiDelegate = coordinator
         webView.setValue(false, forKey: "drawsBackground")
         
         // Store webView reference for parent
@@ -1288,7 +1382,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         return webView
     }
     
-    func updateNSView(_ webView: WKWebView, context: Context) {
+    func updateNSView(_ webView: GutenbergWKWebView, context: Context) {
         // Update content if post has changed
         context.coordinator.updateContent(post.content)
     }
@@ -1423,25 +1517,6 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     margin-bottom: 4px;
                 }
                 
-                .block-context-menu {
-                    position: fixed;
-                    background: white;
-                    border: 1px solid #ddd;
-                    border-radius: 6px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                    padding: 8px 0;
-                    z-index: 1000;
-                    min-width: 150px;
-                }
-                
-                .block-context-menu div {
-                    padding: 8px 16px;
-                    cursor: pointer;
-                }
-                
-                .block-context-menu div:hover {
-                    background-color: #f5f5f5;
-                }
                 
                 .loading {
                     text-align: center;
@@ -1595,11 +1670,6 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         const contentElement = this.createContentElement(block);
                         blockElement.appendChild(contentElement);
                         
-                        // Add context menu
-                        blockElement.addEventListener('contextmenu', (e) => {
-                            e.preventDefault();
-                            this.showBlockContextMenu(e, index);
-                        });
                         
                         return blockElement;
                     }
@@ -2105,70 +2175,6 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         });
                     }
                     
-                    // Block Context Menu
-                    showBlockContextMenu(event, blockIndex) {
-                        const contextMenu = document.createElement('div');
-                        contextMenu.className = 'block-context-menu';
-                        contextMenu.style.cssText = `
-                            position: absolute;
-                            background: white;
-                            border: 1px solid #ddd;
-                            border-radius: 6px;
-                            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                            padding: 8px 0;
-                            z-index: 1000;
-                            min-width: 150px;
-                        `;
-                        
-                        const menuItems = [
-                            { label: 'Move Up', action: () => this.moveBlockUp(blockIndex), disabled: blockIndex === 0 },
-                            { label: 'Move Down', action: () => this.moveBlockDown(blockIndex), disabled: blockIndex === this.blocks.length - 1 },
-                            { label: 'Delete Block', action: () => this.deleteBlock(blockIndex), disabled: this.blocks.length === 1 },
-                            { label: 'Duplicate', action: () => this.duplicateBlock(blockIndex) }
-                        ];
-                        
-                        menuItems.forEach(item => {
-                            const menuItem = document.createElement('div');
-                            menuItem.textContent = item.label;
-                            menuItem.style.cssText = `
-                                padding: 8px 16px;
-                                cursor: pointer;
-                                color: ${item.disabled ? '#ccc' : '#333'};
-                                pointer-events: ${item.disabled ? 'none' : 'auto'};
-                            `;
-                            
-                            if (!item.disabled) {
-                                menuItem.addEventListener('click', () => {
-                                    item.action();
-                                    document.body.removeChild(contextMenu);
-                                });
-                                
-                                menuItem.addEventListener('mouseover', () => {
-                                    menuItem.style.backgroundColor = '#f5f5f5';
-                                });
-                                
-                                menuItem.addEventListener('mouseout', () => {
-                                    menuItem.style.backgroundColor = 'transparent';
-                                });
-                            }
-                            
-                            contextMenu.appendChild(menuItem);
-                        });
-                        
-                        contextMenu.style.left = event.pageX + 'px';
-                        contextMenu.style.top = event.pageY + 'px';
-                        
-                        document.body.appendChild(contextMenu);
-                        
-                        // Close on click outside
-                        const closeHandler = (e) => {
-                            if (!contextMenu.contains(e.target)) {
-                                document.body.removeChild(contextMenu);
-                                document.removeEventListener('click', closeHandler);
-                            }
-                        };
-                        setTimeout(() => document.addEventListener('click', closeHandler), 0);
-                    }
                     
                     moveBlockUp(blockIndex) {
                         if (blockIndex > 0) {
@@ -2343,7 +2349,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
     }
     
     // Same Coordinator class as iOS version
-    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
         
@@ -2418,6 +2424,40 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         func updateContent(_ content: String) {
             // Update editor content through JavaScript
             // This would be implemented with proper WebView reference
+        }
+        
+        // MARK: - Native Context Menu Support
+        
+        @objc func moveBlockUp(_ sender: NSMenuItem) {
+            guard let blockIndex = sender.representedObject as? Int else { return }
+            executeBlockAction("moveBlockUp", blockIndex: blockIndex)
+        }
+        
+        @objc func moveBlockDown(_ sender: NSMenuItem) {
+            guard let blockIndex = sender.representedObject as? Int else { return }
+            executeBlockAction("moveBlockDown", blockIndex: blockIndex)
+        }
+        
+        @objc func deleteBlock(_ sender: NSMenuItem) {
+            guard let blockIndex = sender.representedObject as? Int else { return }
+            executeBlockAction("deleteBlock", blockIndex: blockIndex)
+        }
+        
+        @objc func duplicateBlock(_ sender: NSMenuItem) {
+            guard let blockIndex = sender.representedObject as? Int else { return }
+            executeBlockAction("duplicateBlock", blockIndex: blockIndex)
+        }
+        
+        private func executeBlockAction(_ action: String, blockIndex: Int) {
+            // Get the webView from the parent's webViewRef
+            guard let webView = parent.webViewRef else { return }
+            
+            let script = "window.gutenbergEditor?.\(action)(\(blockIndex))"
+            webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to execute block action \(action): \(error)", level: .error, source: "WebView")
+                }
+            }
         }
     }
 }
