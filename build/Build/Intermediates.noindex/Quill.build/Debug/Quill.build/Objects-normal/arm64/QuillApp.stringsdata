@@ -1,5 +1,16 @@
 {
   "source": "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill/QuillApp.swift",
-  "tables": {},
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Settings...",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 42
+        }
+      }
+    ]
+  },
   "version": 1
 }

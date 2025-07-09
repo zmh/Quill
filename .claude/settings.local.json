@@ -11,7 +11,12 @@
       "Bash(swift -typecheck:*)",
       "Bash(swiftc:*)",
       "Bash(sed:*)",
-      "Bash(log show:*)"
+      "Bash(log show:*)",
+      "Bash(swift:*)",
+      "Bash(sips:*)",
+      "Bash(git commit:*)",
+      "Bash(rg:*)",
+      "Bash(git add:*)"
     ]
   },
   "enableAllProjectMcpServers": false

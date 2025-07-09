@@ -3,14 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>files</key>
-	<dict/>
+	<dict>
+		<key>Resources/AppIcon.icns</key>
+		<data>
+		AA5EEXFjoB+gIMssj0Q52nr6a4M=
+		</data>
+		<key>Resources/Assets.car</key>
+		<data>
+		fYa0gjIBC2Wu8jhTRJC+r3CroRU=
+		</data>
+	</dict>
 	<key>files2</key>
 	<dict>
 		<key>MacOS/Quill.debug.dylib</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			nK0ad1ZfIaaZA7K5YaUvtcBLpqA=
+			C2Aj7e6YIvL4KrpvyMiIwXosIYM=
 			</data>
 			<key>requirement</key>
 			<string>identifier "Quill.debug" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: Zachary Hamed (4QLGWL63U7)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
@@ -23,6 +32,20 @@
 			</data>
 			<key>requirement</key>
 			<string>identifier "__preview" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: Zachary Hamed (4QLGWL63U7)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
+		</dict>
+		<key>Resources/AppIcon.icns</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			zaBrZjy1OsKV56uLYpGG3VPeC+jJMxcC0W3G6qKknQ0=
+			</data>
+		</dict>
+		<key>Resources/Assets.car</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			mQKD/TR4zvPI73MDOzmDUrf5H3mLVIzncRSx+I9RyOM=
+			</data>
 		</dict>
 	</dict>
 	<key>rules</key>

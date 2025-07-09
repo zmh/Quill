@@ -7,7 +7,7 @@
         "key": "",
         "location": {
           "startingColumn": 26,
-          "startingLine": 53
+          "startingLine": 55
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Sync Error",
         "location": {
           "startingColumn": 20,
-          "startingLine": 36
+          "startingLine": 38
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "OK",
         "location": {
           "startingColumn": 24,
-          "startingLine": 37
+          "startingLine": 39
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Select a post to edit",
         "location": {
           "startingColumn": 22,
-          "startingLine": 48
+          "startingLine": 50
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "Settings",
         "location": {
           "startingColumn": 27,
-          "startingLine": 57
+          "startingLine": 59
         }
       },
       {
@@ -47,7 +47,7 @@
         "key": "",
         "location": {
           "startingColumn": 20,
-          "startingLine": 165
+          "startingLine": 182
         }
       },
       {
@@ -55,7 +55,7 @@
         "key": "Search posts",
         "location": {
           "startingColumn": 27,
-          "startingLine": 158
+          "startingLine": 175
         }
       },
       {
@@ -63,7 +63,15 @@
         "key": "All",
         "location": {
           "startingColumn": 22,
-          "startingLine": 166
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete Post",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 202
         }
       },
       {
@@ -71,7 +79,7 @@
         "key": "Refresh",
         "location": {
           "startingColumn": 31,
-          "startingLine": 204
+          "startingLine": 229
         }
       },
       {
@@ -79,7 +87,7 @@
         "key": "New Post",
         "location": {
           "startingColumn": 27,
-          "startingLine": 211
+          "startingLine": 236
         }
       },
       {
@@ -87,7 +95,15 @@
         "key": "%lld words",
         "location": {
           "startingColumn": 22,
-          "startingLine": 270
+          "startingLine": 337
+        }
+      },
+      {
+        "comment": "",
+        "key": "Publish Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 458
         }
       },
       {
@@ -95,23 +111,39 @@
         "key": "Title",
         "location": {
           "startingColumn": 23,
-          "startingLine": 288
+          "startingLine": 366
         }
       },
       {
         "comment": "",
         "key": "%lld words",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 304
+          "startingColumn": 26,
+          "startingLine": 389
         }
       },
       {
         "comment": "",
-        "key": "Publish",
+        "key": "View on Site",
         "location": {
-          "startingColumn": 24,
-          "startingLine": 318
+          "startingColumn": 27,
+          "startingLine": 400
+        }
+      },
+      {
+        "comment": "",
+        "key": "Publishing...",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 417
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 459
         }
       },
       {
@@ -119,7 +151,7 @@
         "key": "New Post",
         "location": {
           "startingColumn": 22,
-          "startingLine": 356
+          "startingLine": 623
         }
       },
       {
@@ -127,7 +159,7 @@
         "key": "Cancel",
         "location": {
           "startingColumn": 24,
-          "startingLine": 361
+          "startingLine": 628
         }
       },
       {
@@ -135,7 +167,7 @@
         "key": "Create",
         "location": {
           "startingColumn": 24,
-          "startingLine": 366
+          "startingLine": 633
         }
       },
       {
@@ -143,7 +175,7 @@
         "key": "What would you like to say?",
         "location": {
           "startingColumn": 22,
-          "startingLine": 383
+          "startingLine": 650
         }
       },
       {
@@ -151,63 +183,103 @@
         "key": "First line becomes the title",
         "location": {
           "startingColumn": 22,
-          "startingLine": 393
+          "startingLine": 660
         }
       },
       {
         "comment": "",
-        "key": "Post Details",
+        "key": "Title:",
         "location": {
-          "startingColumn": 21,
-          "startingLine": 411
+          "startingColumn": 22,
+          "startingLine": 680
         }
       },
       {
         "comment": "",
-        "key": "Statistics",
-        "location": {
-          "startingColumn": 21,
-          "startingLine": 430
-        }
-      },
-      {
-        "comment": "",
-        "key": "Title",
+        "key": "",
         "location": {
           "startingColumn": 27,
-          "startingLine": 412
+          "startingLine": 683
         }
       },
       {
         "comment": "",
-        "key": "Slug",
+        "key": "Slug:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 689
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
         "location": {
           "startingColumn": 27,
-          "startingLine": 413
+          "startingLine": 692
         }
       },
       {
         "comment": "",
-        "key": "Status",
+        "key": "Status:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 698
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
         "location": {
           "startingColumn": 24,
-          "startingLine": 415
+          "startingLine": 701
         }
       },
       {
         "comment": "",
-        "key": "Publish Date",
+        "key": "Publish:",
         "location": {
-          "startingColumn": 32,
-          "startingLine": 422
+          "startingColumn": 26,
+          "startingLine": 714
         }
       },
       {
         "comment": "",
-        "key": "Words",
+        "key": "",
         "location": {
           "startingColumn": 32,
-          "startingLine": 431
+          "startingLine": 717
+        }
+      },
+      {
+        "comment": "",
+        "key": "Words:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 732
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 735
+        }
+      },
+      {
+        "comment": "",
+        "key": "Created:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 741
+        }
+      },
+      {
+        "comment": "",
+        "key": "Modified:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 751
         }
       }
     ]

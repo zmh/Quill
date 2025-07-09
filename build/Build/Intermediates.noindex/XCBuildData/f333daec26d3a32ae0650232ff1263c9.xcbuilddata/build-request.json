@@ -1,0 +1,66 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "bc05e56ab6486c31efeb4b50b01eb98aba4aa2faa87f1867ce63ea88b1a69451"
+    }
+  ],
+  "containerPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "platform" : "macosx",
+      "sdk" : "macosx15.5",
+      "sdkVariant" : "macos",
+      "supportedArchitectures" : [
+        "arm64e",
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build/Build/Products",
+      "derivedDataPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build",
+      "indexDataStoreFolderPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ACTION" : "build",
+          "CLANG_COVERAGE_MAPPING" : "YES",
+          "CLANG_PROFILE_DATA_DIRECTORY" : "/Users/zacharyhamed/Desktop/Downloads/Quill app/build/Build/ProfileData",
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "YES",
+          "ONLY_ACTIVE_ARCH" : "YES"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

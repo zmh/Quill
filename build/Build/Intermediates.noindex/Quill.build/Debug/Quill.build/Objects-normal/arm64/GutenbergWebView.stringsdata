@@ -1,5 +1,16 @@
 {
   "source": "/Users/zacharyhamed/Desktop/Downloads/Quill app/Quill/Quill/GutenbergWebView.swift",
-  "tables": {},
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Loading editor...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 45
+        }
+      }
+    ]
+  },
   "version": 1
 }
