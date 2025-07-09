@@ -767,6 +767,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         if (this.blocks.length > 1) {
                             this.blocks.splice(blockIndex, 1);
                             this.render();
+                            this.handleContentChange();
                         }
                     }
                     
@@ -922,6 +923,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             this.blocks.splice(blockIndex - 1, 0, block);
                             this.render();
                             this.focusBlock(blockIndex - 1);
+                            this.handleContentChange();
                         }
                     }
                     
@@ -931,6 +933,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             this.blocks.splice(blockIndex + 1, 0, block);
                             this.render();
                             this.focusBlock(blockIndex + 1);
+                            this.handleContentChange();
                         }
                     }
                     
@@ -945,6 +948,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.blocks.splice(blockIndex + 1, 0, duplicatedBlock);
                         this.render();
                         this.focusBlock(blockIndex + 1);
+                        this.handleContentChange();
                     }
                     
                     // HTML Parsing
@@ -2027,6 +2031,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         if (this.blocks.length > 1) {
                             this.blocks.splice(blockIndex, 1);
                             this.render();
+                            this.handleContentChange();
                         }
                     }
                     
@@ -2182,6 +2187,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             this.blocks.splice(blockIndex - 1, 0, block);
                             this.render();
                             this.focusBlock(blockIndex - 1);
+                            this.handleContentChange();
                         }
                     }
                     
@@ -2191,6 +2197,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             this.blocks.splice(blockIndex + 1, 0, block);
                             this.render();
                             this.focusBlock(blockIndex + 1);
+                            this.handleContentChange();
                         }
                     }
                     
@@ -2205,6 +2212,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.blocks.splice(blockIndex + 1, 0, duplicatedBlock);
                         this.render();
                         this.focusBlock(blockIndex + 1);
+                        this.handleContentChange();
                     }
                     
                     // HTML Parsing
