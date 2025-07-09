@@ -58,7 +58,11 @@ class WordPressAPI {
         let baseURL = normalizeURL(siteURL)
         let endpoint = "\(baseURL)/wp-json/wp/v2/media"
         
+        DebugLogger.shared.log("Starting image upload to: \(endpoint)", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Image details - Filename: \(filename), Size: \(imageData.count) bytes, MIME: \(mimeType)", level: .info, source: "WordPressAPI")
+        
         guard let url = URL(string: endpoint) else {
+            DebugLogger.shared.log("Invalid URL: \(endpoint)", level: .error, source: "WordPressAPI")
             throw WordPressError.invalidURL
         }
         
@@ -70,6 +74,7 @@ class WordPressAPI {
         if let credentialData = credentials.data(using: .utf8) {
             let base64Credentials = credentialData.base64EncodedString()
             request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+            DebugLogger.shared.log("Authorization header added for user: \(username)", level: .debug, source: "WordPressAPI")
         }
         
         // Create multipart form data
@@ -89,29 +94,39 @@ class WordPressAPI {
         request.httpBody = body
         request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
         
+        DebugLogger.shared.log("Sending multipart request with body size: \(body.count) bytes", level: .info, source: "WordPressAPI")
+        
         let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
+            DebugLogger.shared.log("Invalid response type", level: .error, source: "WordPressAPI")
             throw WordPressError.invalidResponse
         }
+        
+        DebugLogger.shared.log("Response status code: \(httpResponse.statusCode)", level: .info, source: "WordPressAPI")
         
         if httpResponse.statusCode == 201 {
             do {
                 let decoder = JSONDecoder()
                 let media = try decoder.decode(WordPressMedia.self, from: data)
+                DebugLogger.shared.log("Image uploaded successfully! Media ID: \(media.id), URL: \(media.sourceUrl)", level: .info, source: "WordPressAPI")
                 return media
             } catch {
                 if let responseString = String(data: data, encoding: .utf8) {
+                    DebugLogger.shared.log("Raw media response: \(responseString)", level: .debug, source: "WordPressAPI")
                     print("Raw media response: \(responseString)")
                 }
+                DebugLogger.shared.log("Media decoding error: \(error)", level: .error, source: "WordPressAPI")
                 print("Media decoding error: \(error)")
                 throw WordPressError.decodingError
             }
         } else if httpResponse.statusCode == 401 {
+            DebugLogger.shared.log("Unauthorized - check username and password", level: .error, source: "WordPressAPI")
             throw WordPressError.unauthorized
         } else {
             // Print error response for debugging
             if let responseString = String(data: data, encoding: .utf8) {
+                DebugLogger.shared.log("Media upload error response: \(responseString)", level: .error, source: "WordPressAPI")
                 print("Media upload error response: \(responseString)")
             }
             throw WordPressError.httpError(statusCode: httpResponse.statusCode)

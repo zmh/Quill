@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import UniformTypeIdentifiers
 
 // MARK: - Gutenberg WebView Editor
 
@@ -106,6 +107,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         configuration.userContentController.add(coordinator, name: "heightUpdate")
         configuration.userContentController.add(coordinator, name: "editorReady")
         configuration.userContentController.add(coordinator, name: "editorError")
+        configuration.userContentController.add(coordinator, name: "imageUpload")
+        configuration.userContentController.add(coordinator, name: "requestImagePicker")
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
@@ -145,7 +148,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Gutenberg Editor</title>
             <style>
                 :root {
@@ -168,19 +171,25 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
                     background-color: #ffffff;
+                    overflow-x: hidden;
                 }
                 
                 .editor-container {
                     max-width: 100%;
                     margin: 0 auto;
+                    overflow-x: hidden;
                 }
                 
                 .wp-block-editor__container {
                     background: #fff;
+                    max-width: 100%;
+                    overflow-x: hidden;
                 }
                 
                 .block-editor-writing-flow {
                     height: auto !important;
+                    max-width: 100%;
+                    overflow-x: hidden;
                 }
                 
                 /* Native-looking blocks without backgrounds */
@@ -190,6 +199,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     padding: 4px;
                     border-radius: 4px;
                     transition: background-color 0.15s ease;
+                    max-width: 100%;
+                    box-sizing: border-box;
                 }
                 
                 /* Remove hover background for more native feel */
@@ -221,6 +232,66 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 .wp-block[data-type="core/heading"] h6 {
                     margin: 0.5em 0;
                     font-family: var(--editor-font-family);
+                }
+                
+                /* Image blocks */
+                .wp-block[data-type="image"] figure {
+                    margin: 1em 0;
+                    text-align: center;
+                }
+                
+                .wp-block[data-type="image"] img {
+                    max-width: 100%;
+                    height: auto;
+                    border-radius: 4px;
+                }
+                
+                /* WordPress-style image blocks */
+                .wp-block-image {
+                    margin: 1em 0;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                }
+                
+                .wp-block-image figure {
+                    margin: 0;
+                    max-width: 100%;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                
+                .wp-block-image img {
+                    max-width: 100%;
+                    width: auto;
+                    height: auto;
+                    display: block;
+                    border-radius: 4px;
+                    box-sizing: border-box;
+                }
+                
+                /* Ensure all figure elements are constrained */
+                figure {
+                    max-width: 100%;
+                    margin: 0;
+                    box-sizing: border-box;
+                }
+                
+                /* Ensure all images in the editor are constrained */
+                .block-editor-writing-flow img {
+                    max-width: 100% !important;
+                    height: auto !important;
+                }
+                
+                .image-loading {
+                    position: relative;
+                    padding: 40px;
+                    text-align: center;
+                    color: #666;
+                    background: #f5f5f5;
+                    border-radius: 4px;
+                    font-style: italic;
+                    min-height: 200px;
                 }
                 
                 /* Native macOS-style slash command menu */
@@ -782,8 +853,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         element.className = 'wp-block-content';
                         element.style.outline = 'none';
                         
-                        // Special handling for list elements
-                        if (block.type === 'list' || block.type === 'ordered-list') {
+                        // Special handling for different block types
+                        if (block.type === 'image') {
+                            // Image blocks are not editable
+                            element.contentEditable = 'false';
+                            if (block.attributes.uploading) {
+                                element.innerHTML = block.content || '<div class="image-loading">Uploading image...</div>';
+                            } else {
+                                element.innerHTML = block.content || '';
+                            }
+                            // Add wp-block-image class for proper styling
+                            element.className += ' wp-block-image';
+                        } else if (block.type === 'list' || block.type === 'ordered-list') {
                             element.innerHTML = block.content || '<li></li>';
                             
                             // List-specific setup for first item focus
@@ -818,7 +899,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             'quote': 'blockquote',
                             'pullquote': 'blockquote',
                             'list': 'ul',
-                            'ordered-list': 'ol'
+                            'ordered-list': 'ol',
+                            'image': 'figure'
                         };
                         return tags[type] || 'p';
                     }
@@ -915,20 +997,28 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         if (index >= 0 && index < this.blocks.length) {
                             const blockElement = this.blocksContainer.children[index];
                             const contentElement = blockElement.querySelector('.wp-block-content');
+                            const block = this.blocks[index];
+                            
                             if (contentElement) {
                                 // Update current block
                                 const blockId = blockElement.getAttribute('data-block-id');
                                 this.setCurrentBlock(blockId);
                                 
-                                // Focus the container first
-                                this.blocksContainer.focus();
-                                // Place cursor at end of the block
-                                const range = document.createRange();
-                                const sel = window.getSelection();
-                                range.selectNodeContents(contentElement);
-                                range.collapse(false);
-                                sel.removeAllRanges();
-                                sel.addRange(range);
+                                // Skip cursor placement for non-editable blocks
+                                if (block.type === 'image') {
+                                    // Just set focus to container, don't try to place cursor
+                                    this.blocksContainer.focus();
+                                } else {
+                                    // Focus the container first
+                                    this.blocksContainer.focus();
+                                    // Place cursor at end of the block
+                                    const range = document.createRange();
+                                    const sel = window.getSelection();
+                                    range.selectNodeContents(contentElement);
+                                    range.collapse(false);
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                }
                             }
                         }
                     }
@@ -1178,6 +1268,16 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                     
                     executeSlashCommand(blockType, blockIndex) {
+                        // Clear the slash command text from the block
+                        this.blocks[blockIndex].content = '';
+                        
+                        // Special handling for image blocks
+                        if (blockType === 'image') {
+                            this.hideSlashCommands();
+                            this.showImagePicker(blockIndex);
+                            return;
+                        }
+                        
                         this.blocks[blockIndex].type = blockType;
                         
                         // Set appropriate content for list types
@@ -1190,6 +1290,76 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.hideSlashCommands();
                         this.render();
                         this.focusBlock(blockIndex);
+                    }
+                    
+                    showImagePicker(blockIndex) {
+                        window.webkit.messageHandlers.editorError.postMessage('showImagePicker called for block ' + blockIndex);
+                        
+                        // Request native image picker
+                        window.webkit.messageHandlers.requestImagePicker.postMessage({
+                            blockIndex: blockIndex,
+                            blockId: this.blocks[blockIndex].id
+                        });
+                        
+                        // Update block to show placeholder while waiting
+                        this.blocks[blockIndex].type = 'image';
+                        this.blocks[blockIndex].content = '<div class="image-loading">Select an image...</div>';
+                        this.blocks[blockIndex].attributes = {
+                            selecting: true
+                        };
+                        this.render();
+                    }
+                    
+                    handleImageFile(file, blockIndex) {
+                        // First, create a placeholder image block with loading state
+                        this.blocks[blockIndex].type = 'image';
+                        this.blocks[blockIndex].content = '<div class="image-loading">Uploading image...</div>';
+                        this.blocks[blockIndex].attributes = {
+                            uploading: true
+                        };
+                        this.render();
+                        
+                        // Read the file as data URL for immediate preview
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const dataUrl = e.target.result;
+                            
+                            // Update block with preview
+                            this.blocks[blockIndex].content = `<img src="${dataUrl}" alt="${file.name}" style="max-width: 100%; height: auto;" />`;
+                            this.blocks[blockIndex].attributes = {
+                                dataUrl: dataUrl,
+                                fileName: file.name,
+                                uploading: true
+                            };
+                            this.render();
+                            
+                            // Notify native app to handle the actual upload
+                            window.webkit.messageHandlers.imageUpload.postMessage({
+                                blockId: this.blocks[blockIndex].id,
+                                blockIndex: blockIndex,
+                                dataUrl: dataUrl,
+                                fileName: file.name,
+                                fileSize: file.size,
+                                mimeType: file.type
+                            });
+                        };
+                        
+                        reader.readAsDataURL(file);
+                    }
+                    
+                    // Called from native app after successful upload
+                    updateImageBlock(blockId, imageUrl, imageId) {
+                        const blockIndex = this.blocks.findIndex(b => b.id === blockId);
+                        if (blockIndex >= 0) {
+                            this.blocks[blockIndex].content = `<figure class="wp-block-image"><img src="${imageUrl}" alt="" /></figure>`;
+                            this.blocks[blockIndex].attributes = {
+                                id: imageId,
+                                url: imageUrl,
+                                uploading: false
+                            };
+                            this.render();
+                            this.handleContentChange();
+                        }
                     }
                     
                     handleSlashCommandKeydown(event) {
@@ -1344,6 +1514,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         const content = element.innerHTML;
                         
                         let type = 'paragraph';
+                        let attributes = {};
+                        
                         switch (tagName) {
                             case 'h1': type = 'heading-1'; break;
                             case 'h2': type = 'heading-2'; break;
@@ -1357,13 +1529,24 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 break;
                             case 'ul': type = 'list'; break;
                             case 'ol': type = 'ordered-list'; break;
+                            case 'figure':
+                                // Check if it's an image block
+                                if (element.className.includes('wp-block-image')) {
+                                    type = 'image';
+                                    const img = element.querySelector('img');
+                                    if (img) {
+                                        attributes.url = img.src;
+                                        attributes.alt = img.alt || '';
+                                    }
+                                }
+                                break;
                         }
                         
                         return {
                             id: this.generateBlockId(),
                             type: type,
                             content: content,
-                            attributes: {}
+                            attributes: attributes
                         };
                     }
                     
@@ -1490,6 +1673,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     self.handleEditorReady()
                 case "editorError":
                     self.handleEditorError(message.body)
+                case "imageUpload":
+                    self.handleImageUpload(message.body)
+                case "requestImagePicker":
+                    self.handleImagePickerRequest(message.body)
                 default:
                     break
                 }
@@ -1528,6 +1715,173 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             
             // Send debug message to DebugLogger
             DebugLogger.shared.log(message, level: .error, source: "WebView")
+        }
+        
+        private func handleImageUpload(_ body: Any) {
+            guard let data = body as? [String: Any],
+                  let blockId = data["blockId"] as? String,
+                  let dataUrl = data["dataUrl"] as? String,
+                  let fileName = data["fileName"] as? String else {
+                DebugLogger.shared.log("Invalid image upload data", level: .error, source: "WebView")
+                return
+            }
+            
+            // For now, we'll just use the data URL directly
+            // In a real implementation, you would upload to WordPress media library
+            DebugLogger.shared.log("Image selected: \(fileName)", level: .info, source: "WebView")
+            
+            // Update the image block with the data URL
+            // In production, this would be the uploaded image URL from WordPress
+            if let webView = parent.webViewRef {
+                let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
+                let script = """
+                    if (window.gutenbergEditor && window.gutenbergEditor.updateImageBlock) {
+                        window.gutenbergEditor.updateImageBlock('\(blockId)', '\(escapedUrl)', 'temp-id');
+                    }
+                """
+                webView.evaluateJavaScript(script) { _, error in
+                    if let error = error {
+                        DebugLogger.shared.log("Error updating image block: \(error)", level: .error, source: "WebView")
+                    }
+                }
+            }
+        }
+        
+        private func handleImagePickerRequest(_ body: Any) {
+            guard let data = body as? [String: Any],
+                  let blockIndex = data["blockIndex"] as? Int,
+                  let blockId = data["blockId"] as? String else {
+                DebugLogger.shared.log("Invalid image picker request data", level: .error, source: "WebView")
+                return
+            }
+            
+            #if os(macOS)
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            panel.allowedContentTypes = [.image]
+            panel.prompt = "Select Image"
+            
+            if panel.runModal() == .OK, let url = panel.url {
+                    // Read the image file
+                    if let imageData = try? Data(contentsOf: url) {
+                        let mimeType = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
+                        let fileName = url.lastPathComponent
+                        
+                        // First, show a preview with data URL while uploading
+                        let base64String = imageData.base64EncodedString()
+                        let dataUrl = "data:\(mimeType);base64,\(base64String)"
+                        
+                        if let webView = self.parent.webViewRef {
+                            // Show preview immediately
+                            let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
+                            let previewScript = """
+                                if (window.gutenbergEditor) {
+                                    window.gutenbergEditor.blocks[\(blockIndex)].type = 'image';
+                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-loading" style="position: relative;"><img src="\(escapedUrl)" alt="\(fileName)" style="max-width: 100%; height: auto; opacity: 0.5;" /><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.9); padding: 10px; border-radius: 4px;">Uploading to WordPress...</div></div>';
+                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                        uploading: true,
+                                        fileName: '\(fileName)'
+                                    };
+                                    window.gutenbergEditor.render();
+                                }
+                            """
+                            webView.evaluateJavaScript(previewScript) { _, _ in }
+                        }
+                        
+                        // Upload to WordPress if we have site configuration
+                        if let siteConfig = self.parent.siteConfig {
+                            DebugLogger.shared.log("Site configuration found. Site URL: \(siteConfig.siteURL), Username: \(siteConfig.username)", level: .info, source: "WebView")
+                            Task {
+                                do {
+                                    DebugLogger.shared.log("Starting image upload to WordPress: \(fileName), Size: \(imageData.count) bytes, MIME: \(mimeType)", level: .info, source: "WebView")
+                                    
+                                    // Retrieve password from keychain
+                                    guard let password = try? KeychainManager.shared.retrieve(for: siteConfig.keychainIdentifier),
+                                          !password.isEmpty else {
+                                        throw WordPressError.unauthorized
+                                    }
+                                    
+                                    let media = try await WordPressAPI.shared.uploadImage(
+                                        siteURL: siteConfig.siteURL,
+                                        username: siteConfig.username,
+                                        password: password,
+                                        imageData: imageData,
+                                        filename: fileName,
+                                        mimeType: mimeType
+                                    )
+                                    
+                                    DebugLogger.shared.log("Image uploaded successfully. URL: \(media.sourceUrl)", level: .info, source: "WebView")
+                                    
+                                    // Update the block with the real URL
+                                    await MainActor.run {
+                                        if let webView = self.parent.webViewRef {
+                                            let escapedUrl = media.sourceUrl.replacingOccurrences(of: "'", with: "\\'")
+                                            let altText = media.altText.isEmpty ? fileName : media.altText.replacingOccurrences(of: "'", with: "\\'")
+                                            let updateScript = """
+                                                if (window.gutenbergEditor) {
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<figure class="wp-block-image"><img src="\(escapedUrl)" alt="\(altText)" /></figure>';
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                                        id: \(media.id),
+                                                        url: '\(escapedUrl)',
+                                                        alt: '\(altText)',
+                                                        uploading: false
+                                                    };
+                                                    window.gutenbergEditor.render();
+                                                    window.gutenbergEditor.handleContentChange();
+                                                }
+                                            """
+                                            webView.evaluateJavaScript(updateScript) { _, error in
+                                                if let error = error {
+                                                    DebugLogger.shared.log("Error updating image block after upload: \(error)", level: .error, source: "WebView")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch {
+                                    DebugLogger.shared.log("Failed to upload image: \(error)", level: .error, source: "WebView")
+                                    
+                                    // Show error state
+                                    await MainActor.run {
+                                        if let webView = self.parent.webViewRef {
+                                            let errorScript = """
+                                                if (window.gutenbergEditor) {
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: #ffebee; color: #c62828; border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                                        error: true,
+                                                        uploading: false
+                                                    };
+                                                    window.gutenbergEditor.render();
+                                                }
+                                            """
+                                            webView.evaluateJavaScript(errorScript) { _, _ in }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // No site configuration, just use the data URL
+                            DebugLogger.shared.log("No site configuration available, using data URL", level: .warning, source: "WebView")
+                            if let webView = self.parent.webViewRef {
+                                let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
+                                let script = """
+                                    if (window.gutenbergEditor) {
+                                        window.gutenbergEditor.blocks[\(blockIndex)].content = '<img src="\(escapedUrl)" alt="\(fileName)" style="max-width: 100%; height: auto;" />';
+                                        window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                            dataUrl: '\(escapedUrl)',
+                                            fileName: '\(fileName)',
+                                            uploading: false
+                                        };
+                                        window.gutenbergEditor.render();
+                                        window.gutenbergEditor.handleContentChange();
+                                    }
+                                """
+                                webView.evaluateJavaScript(script) { _, _ in }
+                            }
+                        }
+                    }
+                }
+            #endif
         }
         
         // MARK: - Content Management
@@ -1727,12 +2081,18 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         configuration.userContentController.add(coordinator, name: "heightUpdate")
         configuration.userContentController.add(coordinator, name: "editorReady")
         configuration.userContentController.add(coordinator, name: "editorError")
+        configuration.userContentController.add(coordinator, name: "imageUpload")
+        configuration.userContentController.add(coordinator, name: "requestImagePicker")
         
         let webView = GutenbergWKWebView(frame: .zero, configuration: configuration)
         webView.coordinator = coordinator
         webView.navigationDelegate = coordinator
         webView.uiDelegate = coordinator
         webView.setValue(false, forKey: "drawsBackground")
+        
+        // Prevent horizontal scrolling in the WebView itself
+        webView.enclosingScrollView?.hasHorizontalScroller = false
+        webView.enclosingScrollView?.horizontalScrollElasticity = .none
         
         // Store webView reference for parent
         DispatchQueue.main.async {
@@ -1767,7 +2127,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Gutenberg Editor</title>
             <style>
                 :root {
@@ -1790,19 +2150,25 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
                     background-color: #ffffff;
+                    overflow-x: hidden;
                 }
                 
                 .editor-container {
                     max-width: 100%;
                     margin: 0 auto;
+                    overflow-x: hidden;
                 }
                 
                 .wp-block-editor__container {
                     background: #fff;
+                    max-width: 100%;
+                    overflow-x: hidden;
                 }
                 
                 .block-editor-writing-flow {
                     height: auto !important;
+                    max-width: 100%;
+                    overflow-x: hidden;
                 }
                 
                 /* Native-looking blocks without backgrounds */
@@ -1812,6 +2178,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     padding: 4px;
                     border-radius: 4px;
                     transition: background-color 0.15s ease;
+                    max-width: 100%;
+                    box-sizing: border-box;
                 }
                 
                 /* Remove hover background for more native feel */
@@ -1839,6 +2207,66 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 /* Code blocks should always use monospace */
                 pre.wp-block-content {
                     font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+                }
+                
+                /* Image blocks */
+                .wp-block[data-type="image"] figure {
+                    margin: 1em 0;
+                    text-align: center;
+                }
+                
+                .wp-block[data-type="image"] img {
+                    max-width: 100%;
+                    height: auto;
+                    border-radius: 4px;
+                }
+                
+                /* WordPress-style image blocks */
+                .wp-block-image {
+                    margin: 1em 0;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                }
+                
+                .wp-block-image figure {
+                    margin: 0;
+                    max-width: 100%;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                
+                .wp-block-image img {
+                    max-width: 100%;
+                    width: auto;
+                    height: auto;
+                    display: block;
+                    border-radius: 4px;
+                    box-sizing: border-box;
+                }
+                
+                /* Ensure all figure elements are constrained */
+                figure {
+                    max-width: 100%;
+                    margin: 0;
+                    box-sizing: border-box;
+                }
+                
+                /* Ensure all images in the editor are constrained */
+                .block-editor-writing-flow img {
+                    max-width: 100% !important;
+                    height: auto !important;
+                }
+                
+                .image-loading {
+                    position: relative;
+                    padding: 40px;
+                    text-align: center;
+                    color: #666;
+                    background: #f5f5f5;
+                    border-radius: 4px;
+                    font-style: italic;
+                    min-height: 200px;
                 }
                 
                 /* Native macOS-style slash command menu */
@@ -2316,8 +2744,18 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         element.className = 'wp-block-content';
                         element.style.outline = 'none';
                         
-                        // Special handling for list elements
-                        if (block.type === 'list' || block.type === 'ordered-list') {
+                        // Special handling for different block types
+                        if (block.type === 'image') {
+                            // Image blocks are not editable
+                            element.contentEditable = 'false';
+                            if (block.attributes.uploading) {
+                                element.innerHTML = block.content || '<div class="image-loading">Uploading image...</div>';
+                            } else {
+                                element.innerHTML = block.content || '';
+                            }
+                            // Add wp-block-image class for proper styling
+                            element.className += ' wp-block-image';
+                        } else if (block.type === 'list' || block.type === 'ordered-list') {
                             element.innerHTML = block.content || '<li></li>';
                             
                             // List-specific setup for first item focus
@@ -2352,7 +2790,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             'quote': 'blockquote',
                             'pullquote': 'blockquote',
                             'list': 'ul',
-                            'ordered-list': 'ol'
+                            'ordered-list': 'ol',
+                            'image': 'figure'
                         };
                         return tags[type] || 'p';
                     }
@@ -2449,20 +2888,28 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         if (index >= 0 && index < this.blocks.length) {
                             const blockElement = this.blocksContainer.children[index];
                             const contentElement = blockElement.querySelector('.wp-block-content');
+                            const block = this.blocks[index];
+                            
                             if (contentElement) {
                                 // Update current block
                                 const blockId = blockElement.getAttribute('data-block-id');
                                 this.setCurrentBlock(blockId);
                                 
-                                // Focus the container first
-                                this.blocksContainer.focus();
-                                // Place cursor at end of the block
-                                const range = document.createRange();
-                                const sel = window.getSelection();
-                                range.selectNodeContents(contentElement);
-                                range.collapse(false);
-                                sel.removeAllRanges();
-                                sel.addRange(range);
+                                // Skip cursor placement for non-editable blocks
+                                if (block.type === 'image') {
+                                    // Just set focus to container, don't try to place cursor
+                                    this.blocksContainer.focus();
+                                } else {
+                                    // Focus the container first
+                                    this.blocksContainer.focus();
+                                    // Place cursor at end of the block
+                                    const range = document.createRange();
+                                    const sel = window.getSelection();
+                                    range.selectNodeContents(contentElement);
+                                    range.collapse(false);
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                }
                             }
                         }
                     }
@@ -2801,6 +3248,16 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }
                     
                     executeSlashCommand(blockType, blockIndex) {
+                        // Clear the slash command text from the block
+                        this.blocks[blockIndex].content = '';
+                        
+                        // Special handling for image blocks
+                        if (blockType === 'image') {
+                            this.hideSlashCommands();
+                            this.showImagePicker(blockIndex);
+                            return;
+                        }
+                        
                         this.blocks[blockIndex].type = blockType;
                         
                         // Set appropriate content for list types
@@ -2813,6 +3270,76 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.hideSlashCommands();
                         this.render();
                         this.focusBlock(blockIndex);
+                    }
+                    
+                    showImagePicker(blockIndex) {
+                        window.webkit.messageHandlers.editorError.postMessage('showImagePicker called for block ' + blockIndex);
+                        
+                        // Request native image picker
+                        window.webkit.messageHandlers.requestImagePicker.postMessage({
+                            blockIndex: blockIndex,
+                            blockId: this.blocks[blockIndex].id
+                        });
+                        
+                        // Update block to show placeholder while waiting
+                        this.blocks[blockIndex].type = 'image';
+                        this.blocks[blockIndex].content = '<div class="image-loading">Select an image...</div>';
+                        this.blocks[blockIndex].attributes = {
+                            selecting: true
+                        };
+                        this.render();
+                    }
+                    
+                    handleImageFile(file, blockIndex) {
+                        // First, create a placeholder image block with loading state
+                        this.blocks[blockIndex].type = 'image';
+                        this.blocks[blockIndex].content = '<div class="image-loading">Uploading image...</div>';
+                        this.blocks[blockIndex].attributes = {
+                            uploading: true
+                        };
+                        this.render();
+                        
+                        // Read the file as data URL for immediate preview
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const dataUrl = e.target.result;
+                            
+                            // Update block with preview
+                            this.blocks[blockIndex].content = `<img src="${dataUrl}" alt="${file.name}" style="max-width: 100%; height: auto;" />`;
+                            this.blocks[blockIndex].attributes = {
+                                dataUrl: dataUrl,
+                                fileName: file.name,
+                                uploading: true
+                            };
+                            this.render();
+                            
+                            // Notify native app to handle the actual upload
+                            window.webkit.messageHandlers.imageUpload.postMessage({
+                                blockId: this.blocks[blockIndex].id,
+                                blockIndex: blockIndex,
+                                dataUrl: dataUrl,
+                                fileName: file.name,
+                                fileSize: file.size,
+                                mimeType: file.type
+                            });
+                        };
+                        
+                        reader.readAsDataURL(file);
+                    }
+                    
+                    // Called from native app after successful upload
+                    updateImageBlock(blockId, imageUrl, imageId) {
+                        const blockIndex = this.blocks.findIndex(b => b.id === blockId);
+                        if (blockIndex >= 0) {
+                            this.blocks[blockIndex].content = `<figure class="wp-block-image"><img src="${imageUrl}" alt="" /></figure>`;
+                            this.blocks[blockIndex].attributes = {
+                                id: imageId,
+                                url: imageUrl,
+                                uploading: false
+                            };
+                            this.render();
+                            this.handleContentChange();
+                        }
                     }
                     
                     handleSlashCommandKeydown(event) {
@@ -2967,6 +3494,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         const content = element.innerHTML;
                         
                         let type = 'paragraph';
+                        let attributes = {};
+                        
                         switch (tagName) {
                             case 'h1': type = 'heading-1'; break;
                             case 'h2': type = 'heading-2'; break;
@@ -2980,13 +3509,24 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 break;
                             case 'ul': type = 'list'; break;
                             case 'ol': type = 'ordered-list'; break;
+                            case 'figure':
+                                // Check if it's an image block
+                                if (element.className.includes('wp-block-image')) {
+                                    type = 'image';
+                                    const img = element.querySelector('img');
+                                    if (img) {
+                                        attributes.url = img.src;
+                                        attributes.alt = img.alt || '';
+                                    }
+                                }
+                                break;
                         }
                         
                         return {
                             id: this.generateBlockId(),
                             type: type,
                             content: content,
-                            attributes: {}
+                            attributes: attributes
                         };
                     }
                     
@@ -3108,6 +3648,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     self.handleEditorReady()
                 case "editorError":
                     self.handleEditorError(message.body)
+                case "imageUpload":
+                    self.handleImageUpload(message.body)
+                case "requestImagePicker":
+                    self.handleImagePickerRequest(message.body)
                 default:
                     break
                 }
@@ -3145,6 +3689,173 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             
             // Send debug message to DebugLogger
             DebugLogger.shared.log(message, level: .error, source: "WebView")
+        }
+        
+        private func handleImageUpload(_ body: Any) {
+            guard let data = body as? [String: Any],
+                  let blockId = data["blockId"] as? String,
+                  let dataUrl = data["dataUrl"] as? String,
+                  let fileName = data["fileName"] as? String else {
+                DebugLogger.shared.log("Invalid image upload data", level: .error, source: "WebView")
+                return
+            }
+            
+            // For now, we'll just use the data URL directly
+            // In a real implementation, you would upload to WordPress media library
+            DebugLogger.shared.log("Image selected: \(fileName)", level: .info, source: "WebView")
+            
+            // Update the image block with the data URL
+            // In production, this would be the uploaded image URL from WordPress
+            if let webView = parent.webViewRef {
+                let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
+                let script = """
+                    if (window.gutenbergEditor && window.gutenbergEditor.updateImageBlock) {
+                        window.gutenbergEditor.updateImageBlock('\(blockId)', '\(escapedUrl)', 'temp-id');
+                    }
+                """
+                webView.evaluateJavaScript(script) { _, error in
+                    if let error = error {
+                        DebugLogger.shared.log("Error updating image block: \(error)", level: .error, source: "WebView")
+                    }
+                }
+            }
+        }
+        
+        private func handleImagePickerRequest(_ body: Any) {
+            guard let data = body as? [String: Any],
+                  let blockIndex = data["blockIndex"] as? Int,
+                  let blockId = data["blockId"] as? String else {
+                DebugLogger.shared.log("Invalid image picker request data", level: .error, source: "WebView")
+                return
+            }
+            
+            #if os(macOS)
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = false
+            panel.canChooseDirectories = false
+            panel.allowedContentTypes = [.image]
+            panel.prompt = "Select Image"
+            
+            if panel.runModal() == .OK, let url = panel.url {
+                    // Read the image file
+                    if let imageData = try? Data(contentsOf: url) {
+                        let mimeType = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
+                        let fileName = url.lastPathComponent
+                        
+                        // First, show a preview with data URL while uploading
+                        let base64String = imageData.base64EncodedString()
+                        let dataUrl = "data:\(mimeType);base64,\(base64String)"
+                        
+                        if let webView = self.parent.webViewRef {
+                            // Show preview immediately
+                            let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
+                            let previewScript = """
+                                if (window.gutenbergEditor) {
+                                    window.gutenbergEditor.blocks[\(blockIndex)].type = 'image';
+                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-loading" style="position: relative;"><img src="\(escapedUrl)" alt="\(fileName)" style="max-width: 100%; height: auto; opacity: 0.5;" /><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.9); padding: 10px; border-radius: 4px;">Uploading to WordPress...</div></div>';
+                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                        uploading: true,
+                                        fileName: '\(fileName)'
+                                    };
+                                    window.gutenbergEditor.render();
+                                }
+                            """
+                            webView.evaluateJavaScript(previewScript) { _, _ in }
+                        }
+                        
+                        // Upload to WordPress if we have site configuration
+                        if let siteConfig = self.parent.siteConfig {
+                            DebugLogger.shared.log("Site configuration found. Site URL: \(siteConfig.siteURL), Username: \(siteConfig.username)", level: .info, source: "WebView")
+                            Task {
+                                do {
+                                    DebugLogger.shared.log("Starting image upload to WordPress: \(fileName), Size: \(imageData.count) bytes, MIME: \(mimeType)", level: .info, source: "WebView")
+                                    
+                                    // Retrieve password from keychain
+                                    guard let password = try? KeychainManager.shared.retrieve(for: siteConfig.keychainIdentifier),
+                                          !password.isEmpty else {
+                                        throw WordPressError.unauthorized
+                                    }
+                                    
+                                    let media = try await WordPressAPI.shared.uploadImage(
+                                        siteURL: siteConfig.siteURL,
+                                        username: siteConfig.username,
+                                        password: password,
+                                        imageData: imageData,
+                                        filename: fileName,
+                                        mimeType: mimeType
+                                    )
+                                    
+                                    DebugLogger.shared.log("Image uploaded successfully. URL: \(media.sourceUrl)", level: .info, source: "WebView")
+                                    
+                                    // Update the block with the real URL
+                                    await MainActor.run {
+                                        if let webView = self.parent.webViewRef {
+                                            let escapedUrl = media.sourceUrl.replacingOccurrences(of: "'", with: "\\'")
+                                            let altText = media.altText.isEmpty ? fileName : media.altText.replacingOccurrences(of: "'", with: "\\'")
+                                            let updateScript = """
+                                                if (window.gutenbergEditor) {
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<figure class="wp-block-image"><img src="\(escapedUrl)" alt="\(altText)" /></figure>';
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                                        id: \(media.id),
+                                                        url: '\(escapedUrl)',
+                                                        alt: '\(altText)',
+                                                        uploading: false
+                                                    };
+                                                    window.gutenbergEditor.render();
+                                                    window.gutenbergEditor.handleContentChange();
+                                                }
+                                            """
+                                            webView.evaluateJavaScript(updateScript) { _, error in
+                                                if let error = error {
+                                                    DebugLogger.shared.log("Error updating image block after upload: \(error)", level: .error, source: "WebView")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch {
+                                    DebugLogger.shared.log("Failed to upload image: \(error)", level: .error, source: "WebView")
+                                    
+                                    // Show error state
+                                    await MainActor.run {
+                                        if let webView = self.parent.webViewRef {
+                                            let errorScript = """
+                                                if (window.gutenbergEditor) {
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: #ffebee; color: #c62828; border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                                        error: true,
+                                                        uploading: false
+                                                    };
+                                                    window.gutenbergEditor.render();
+                                                }
+                                            """
+                                            webView.evaluateJavaScript(errorScript) { _, _ in }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // No site configuration, just use the data URL
+                            DebugLogger.shared.log("No site configuration available, using data URL", level: .warning, source: "WebView")
+                            if let webView = self.parent.webViewRef {
+                                let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
+                                let script = """
+                                    if (window.gutenbergEditor) {
+                                        window.gutenbergEditor.blocks[\(blockIndex)].content = '<img src="\(escapedUrl)" alt="\(fileName)" style="max-width: 100%; height: auto;" />';
+                                        window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
+                                            dataUrl: '\(escapedUrl)',
+                                            fileName: '\(fileName)',
+                                            uploading: false
+                                        };
+                                        window.gutenbergEditor.render();
+                                        window.gutenbergEditor.handleContentChange();
+                                    }
+                                """
+                                webView.evaluateJavaScript(script) { _, _ in }
+                            }
+                        }
+                    }
+                }
+            #endif
         }
         
         func updateContent(_ content: String) {

@@ -98,7 +98,8 @@ struct SettingsView: View {
                             }
                         }
                     case "debug":
-                        DebugLogView()
+                        DebugView()
+                            .modelContainer(for: [SiteConfiguration.self])
                     default:
                         EmptyView()
                     }
