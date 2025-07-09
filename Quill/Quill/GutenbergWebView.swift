@@ -203,7 +203,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     font-size: var(--editor-font-size);
                 }
                 
-                .wp-block-content:empty:before {
+                .wp-block.is-focused .wp-block-content:empty:before {
                     content: "Type / for commands";
                     color: #999;
                     font-style: italic;
@@ -348,16 +348,21 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             // First check if the DOM structure has been altered (multi-block edit)
                             if (this.needsBlockStructureSync()) {
                                 this.syncBlocksFromDOM();
-                            } else {
-                                const blockElement = this.findBlockElementFromEvent(e);
-                                if (blockElement) {
-                                    const blockId = blockElement.getAttribute('data-block-id');
-                                    const block = this.blocks.find(b => b.id === blockId);
-                                    if (block) {
-                                        window.webkit.messageHandlers.editorError.postMessage(`INPUT event: text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
-                                        this.handleBlockInput(e, block);
-                                    }
+                                return; // Let the sync handle the update
+                            }
+                            
+                            const blockElement = this.findBlockElementFromEvent(e);
+                            if (blockElement) {
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                const block = this.blocks.find(b => b.id === blockId);
+                                if (block) {
+                                    window.webkit.messageHandlers.editorError.postMessage(`INPUT event: blockId="${blockId}", target="${e.target.className}", showingSlash=${this.showingSlashCommands}`);
+                                    this.handleBlockInput(e, block);
+                                } else {
+                                    window.webkit.messageHandlers.editorError.postMessage(`INPUT event: No block found for blockId="${blockId}"`);
                                 }
+                            } else {
+                                window.webkit.messageHandlers.editorError.postMessage(`INPUT event: No block element found from target "${e.target.className}"`);
                             }
                         });
                         
@@ -383,14 +388,36 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 }
                             }
                         });
+                        
+                        // Handle clicks to update current block
+                        this.blocksContainer.addEventListener('click', (e) => {
+                            const blockElement = this.findBlockElementFromEvent(e);
+                            if (blockElement) {
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                this.setCurrentBlock(blockId);
+                            }
+                        });
                     }
                     
                     findBlockElementFromEvent(event) {
                         let element = event.target;
-                        while (element && !element.classList.contains('wp-block')) {
+                        
+                        // If the target is the container itself, try to find the focused block
+                        if (element === this.blocksContainer) {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                element = range.startContainer.nodeType === Node.TEXT_NODE 
+                                    ? range.startContainer.parentElement 
+                                    : range.startContainer;
+                            }
+                        }
+                        
+                        while (element && element !== this.blocksContainer && !element.classList.contains('wp-block')) {
                             element = element.parentElement;
                         }
-                        return element;
+                        
+                        return element && element.classList.contains('wp-block') ? element : null;
                     }
                     
                     findBlockElementFromNode(node) {
@@ -503,6 +530,16 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                     sel.removeAllRanges();
                                     sel.addRange(range);
                                 }
+                                
+                                // Check if we need to show slash commands after sync
+                                const text = contentElement.innerText.trim();
+                                if (text === '/') {
+                                    const block = this.blocks[cursorInfo.blockIndex];
+                                    if (block) {
+                                        window.webkit.messageHandlers.editorError.postMessage(`Showing slash commands after sync for block ${cursorInfo.blockIndex}`);
+                                        this.showSlashCommands(cursorInfo.blockIndex);
+                                    }
+                                }
                             }
                         }
                         
@@ -589,6 +626,9 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                     
                     render() {
+                        // Save current block before clearing
+                        const previousCurrentBlock = this.currentBlock;
+                        
                         this.blocksContainer.innerHTML = '';
                         
                         this.blocks.forEach((block, index) => {
@@ -596,8 +636,15 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             this.blocksContainer.appendChild(blockElement);
                         });
                         
-                        // Focus the first block if no block is focused
-                        if (!this.currentBlock && this.blocks.length > 0) {
+                        // Restore focus to the previously focused block
+                        if (previousCurrentBlock) {
+                            const blockIndex = this.blocks.findIndex(b => b.id === previousCurrentBlock);
+                            if (blockIndex >= 0) {
+                                this.focusBlock(blockIndex);
+                            } else if (this.blocks.length > 0) {
+                                this.focusBlock(0);
+                            }
+                        } else if (this.blocks.length > 0) {
                             this.focusBlock(0);
                         }
                     }
@@ -848,6 +895,19 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                     
                     setCurrentBlock(blockId) {
+                        // Remove is-focused class from all blocks
+                        const allBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        allBlocks.forEach(block => block.classList.remove('is-focused'));
+                        
+                        // Add is-focused class to the current block
+                        if (blockId) {
+                            const blockElement = this.blocksContainer.querySelector(`[data-block-id="${blockId}"]`);
+                            if (blockElement) {
+                                blockElement.classList.add('is-focused');
+                                window.webkit.messageHandlers.editorError.postMessage(`Set focus to block: ${blockId}, has is-focused: ${blockElement.classList.contains('is-focused')}`);
+                            }
+                        }
+                        
                         this.currentBlock = blockId;
                     }
                     
@@ -856,6 +916,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             const blockElement = this.blocksContainer.children[index];
                             const contentElement = blockElement.querySelector('.wp-block-content');
                             if (contentElement) {
+                                // Update current block
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                this.setCurrentBlock(blockId);
+                                
                                 // Focus the container first
                                 this.blocksContainer.focus();
                                 // Place cursor at end of the block
@@ -1035,9 +1099,14 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
                         `;
                         
+                        // Track selected index
+                        this.selectedCommandIndex = 0;
+                        
                         commands.forEach((command, index) => {
                             const item = document.createElement('div');
                             item.className = 'slash-command-item';
+                            item.setAttribute('data-command-index', index);
+                            item.setAttribute('data-command-type', command.type);
                             item.style.cssText = `
                                 padding: 8px 16px;
                                 cursor: pointer;
@@ -1050,6 +1119,12 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 margin: 2px 0;
                             `;
                             
+                            // Auto-select first item
+                            if (index === 0) {
+                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.classList.add('selected');
+                            }
+                            
                             item.innerHTML = `
                                 <span style="font-size: 14px;">${command.icon}</span>
                                 <span>${command.name}</span>
@@ -1060,11 +1135,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             });
                             
                             item.addEventListener('mouseover', () => {
-                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
-                            });
-                            
-                            item.addEventListener('mouseout', () => {
-                                item.style.backgroundColor = 'transparent';
+                                this.selectCommandItem(index);
                             });
                             
                             this.slashCommandMenu.appendChild(item);
@@ -1077,6 +1148,23 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.slashCommandMenu.style.top = (rect.bottom + 5) + 'px';
                         
                         document.body.appendChild(this.slashCommandMenu);
+                    }
+                    
+                    selectCommandItem(index) {
+                        const items = this.slashCommandMenu.querySelectorAll('.slash-command-item');
+                        
+                        // Clear previous selection
+                        items.forEach((item, i) => {
+                            if (i === index) {
+                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.classList.add('selected');
+                            } else {
+                                item.style.backgroundColor = 'transparent';
+                                item.classList.remove('selected');
+                            }
+                        });
+                        
+                        this.selectedCommandIndex = index;
                     }
                     
                     hideSlashCommands() {
@@ -1105,17 +1193,57 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                     
                     handleSlashCommandKeydown(event) {
+                        if (!this.slashCommandMenu) return;
+                        
+                        const visibleItems = Array.from(this.slashCommandMenu.querySelectorAll('.slash-command-item'))
+                            .filter(item => item.style.display !== 'none');
+                        
                         switch (event.key) {
                             case 'Escape':
                                 event.preventDefault();
                                 this.hideSlashCommands();
                                 break;
+                                
                             case 'Enter':
                                 event.preventDefault();
-                                // Execute first visible command
-                                const firstItem = this.slashCommandMenu.querySelector('.slash-command-item');
-                                if (firstItem) {
-                                    firstItem.click();
+                                // Execute selected command
+                                const selectedItem = this.slashCommandMenu.querySelector('.slash-command-item.selected');
+                                if (selectedItem) {
+                                    selectedItem.click();
+                                }
+                                break;
+                                
+                            case 'ArrowUp':
+                                event.preventDefault();
+                                if (visibleItems.length > 0) {
+                                    // Find current selected item in visible items
+                                    let currentVisibleIndex = visibleItems.findIndex(item => item.classList.contains('selected'));
+                                    if (currentVisibleIndex === -1) currentVisibleIndex = 0;
+                                    
+                                    let newVisibleIndex = currentVisibleIndex - 1;
+                                    if (newVisibleIndex < 0) {
+                                        newVisibleIndex = visibleItems.length - 1;
+                                    }
+                                    
+                                    const itemIndex = parseInt(visibleItems[newVisibleIndex].getAttribute('data-command-index'));
+                                    this.selectCommandItem(itemIndex);
+                                }
+                                break;
+                                
+                            case 'ArrowDown':
+                                event.preventDefault();
+                                if (visibleItems.length > 0) {
+                                    // Find current selected item in visible items
+                                    let currentVisibleIndex = visibleItems.findIndex(item => item.classList.contains('selected'));
+                                    if (currentVisibleIndex === -1) currentVisibleIndex = -1;
+                                    
+                                    let newVisibleIndex = currentVisibleIndex + 1;
+                                    if (newVisibleIndex >= visibleItems.length) {
+                                        newVisibleIndex = 0;
+                                    }
+                                    
+                                    const itemIndex = parseInt(visibleItems[newVisibleIndex].getAttribute('data-command-index'));
+                                    this.selectCommandItem(itemIndex);
                                 }
                                 break;
                         }
@@ -1127,11 +1255,24 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         }
                         
                         const items = this.slashCommandMenu.querySelectorAll('.slash-command-item');
-                        items.forEach(item => {
+                        let firstVisibleIndex = -1;
+                        let hasVisibleItems = false;
+                        
+                        items.forEach((item, index) => {
                             const text = item.textContent.toLowerCase();
                             const visible = text.includes(query.toLowerCase());
                             item.style.display = visible ? 'flex' : 'none';
+                            
+                            if (visible && firstVisibleIndex === -1) {
+                                firstVisibleIndex = index;
+                                hasVisibleItems = true;
+                            }
                         });
+                        
+                        // Auto-select first visible item after filtering
+                        if (hasVisibleItems) {
+                            this.selectCommandItem(firstVisibleIndex);
+                        }
                     }
                     
                     
@@ -1684,7 +1825,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     font-size: var(--editor-font-size);
                 }
                 
-                .wp-block-content:empty:before {
+                .wp-block.is-focused .wp-block-content:empty:before {
                     content: "Type / for commands";
                     color: #999;
                     font-style: italic;
@@ -1829,16 +1970,21 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             // First check if the DOM structure has been altered (multi-block edit)
                             if (this.needsBlockStructureSync()) {
                                 this.syncBlocksFromDOM();
-                            } else {
-                                const blockElement = this.findBlockElementFromEvent(e);
-                                if (blockElement) {
-                                    const blockId = blockElement.getAttribute('data-block-id');
-                                    const block = this.blocks.find(b => b.id === blockId);
-                                    if (block) {
-                                        window.webkit.messageHandlers.editorError.postMessage(`INPUT event: text="${e.target.innerText}", showingSlash=${this.showingSlashCommands}`);
-                                        this.handleBlockInput(e, block);
-                                    }
+                                return; // Let the sync handle the update
+                            }
+                            
+                            const blockElement = this.findBlockElementFromEvent(e);
+                            if (blockElement) {
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                const block = this.blocks.find(b => b.id === blockId);
+                                if (block) {
+                                    window.webkit.messageHandlers.editorError.postMessage(`INPUT event: blockId="${blockId}", target="${e.target.className}", showingSlash=${this.showingSlashCommands}`);
+                                    this.handleBlockInput(e, block);
+                                } else {
+                                    window.webkit.messageHandlers.editorError.postMessage(`INPUT event: No block found for blockId="${blockId}"`);
                                 }
+                            } else {
+                                window.webkit.messageHandlers.editorError.postMessage(`INPUT event: No block element found from target "${e.target.className}"`);
                             }
                         });
                         
@@ -1864,14 +2010,36 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 }
                             }
                         });
+                        
+                        // Handle clicks to update current block
+                        this.blocksContainer.addEventListener('click', (e) => {
+                            const blockElement = this.findBlockElementFromEvent(e);
+                            if (blockElement) {
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                this.setCurrentBlock(blockId);
+                            }
+                        });
                     }
                     
                     findBlockElementFromEvent(event) {
                         let element = event.target;
-                        while (element && !element.classList.contains('wp-block')) {
+                        
+                        // If the target is the container itself, try to find the focused block
+                        if (element === this.blocksContainer) {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                element = range.startContainer.nodeType === Node.TEXT_NODE 
+                                    ? range.startContainer.parentElement 
+                                    : range.startContainer;
+                            }
+                        }
+                        
+                        while (element && element !== this.blocksContainer && !element.classList.contains('wp-block')) {
                             element = element.parentElement;
                         }
-                        return element;
+                        
+                        return element && element.classList.contains('wp-block') ? element : null;
                     }
                     
                     findBlockElementFromNode(node) {
@@ -1984,6 +2152,16 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                     sel.removeAllRanges();
                                     sel.addRange(range);
                                 }
+                                
+                                // Check if we need to show slash commands after sync
+                                const text = contentElement.innerText.trim();
+                                if (text === '/') {
+                                    const block = this.blocks[cursorInfo.blockIndex];
+                                    if (block) {
+                                        window.webkit.messageHandlers.editorError.postMessage(`Showing slash commands after sync for block ${cursorInfo.blockIndex}`);
+                                        this.showSlashCommands(cursorInfo.blockIndex);
+                                    }
+                                }
                             }
                         }
                         
@@ -2070,6 +2248,9 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }
                     
                     render() {
+                        // Save current block before clearing
+                        const previousCurrentBlock = this.currentBlock;
+                        
                         this.blocksContainer.innerHTML = '';
                         
                         this.blocks.forEach((block, index) => {
@@ -2077,8 +2258,15 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             this.blocksContainer.appendChild(blockElement);
                         });
                         
-                        // Focus the first block if no block is focused
-                        if (!this.currentBlock && this.blocks.length > 0) {
+                        // Restore focus to the previously focused block
+                        if (previousCurrentBlock) {
+                            const blockIndex = this.blocks.findIndex(b => b.id === previousCurrentBlock);
+                            if (blockIndex >= 0) {
+                                this.focusBlock(blockIndex);
+                            } else if (this.blocks.length > 0) {
+                                this.focusBlock(0);
+                            }
+                        } else if (this.blocks.length > 0) {
                             this.focusBlock(0);
                         }
                     }
@@ -2241,6 +2429,19 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }
                     
                     setCurrentBlock(blockId) {
+                        // Remove is-focused class from all blocks
+                        const allBlocks = this.blocksContainer.querySelectorAll('.wp-block');
+                        allBlocks.forEach(block => block.classList.remove('is-focused'));
+                        
+                        // Add is-focused class to the current block
+                        if (blockId) {
+                            const blockElement = this.blocksContainer.querySelector(`[data-block-id="${blockId}"]`);
+                            if (blockElement) {
+                                blockElement.classList.add('is-focused');
+                                window.webkit.messageHandlers.editorError.postMessage(`Set focus to block: ${blockId}, has is-focused: ${blockElement.classList.contains('is-focused')}`);
+                            }
+                        }
+                        
                         this.currentBlock = blockId;
                     }
                     
@@ -2249,6 +2450,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             const blockElement = this.blocksContainer.children[index];
                             const contentElement = blockElement.querySelector('.wp-block-content');
                             if (contentElement) {
+                                // Update current block
+                                const blockId = blockElement.getAttribute('data-block-id');
+                                this.setCurrentBlock(blockId);
+                                
                                 // Focus the container first
                                 this.blocksContainer.focus();
                                 // Place cursor at end of the block
@@ -2517,9 +2722,14 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
                         `;
                         
+                        // Track selected index
+                        this.selectedCommandIndex = 0;
+                        
                         commands.forEach((command, index) => {
                             const item = document.createElement('div');
                             item.className = 'slash-command-item';
+                            item.setAttribute('data-command-index', index);
+                            item.setAttribute('data-command-type', command.type);
                             item.style.cssText = `
                                 padding: 8px 16px;
                                 cursor: pointer;
@@ -2532,6 +2742,12 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 margin: 2px 0;
                             `;
                             
+                            // Auto-select first item
+                            if (index === 0) {
+                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.classList.add('selected');
+                            }
+                            
                             item.innerHTML = `
                                 <span style="font-size: 14px;">${command.icon}</span>
                                 <span>${command.name}</span>
@@ -2542,11 +2758,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             });
                             
                             item.addEventListener('mouseover', () => {
-                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
-                            });
-                            
-                            item.addEventListener('mouseout', () => {
-                                item.style.backgroundColor = 'transparent';
+                                this.selectCommandItem(index);
                             });
                             
                             this.slashCommandMenu.appendChild(item);
@@ -2559,6 +2771,23 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.slashCommandMenu.style.top = (rect.bottom + 5) + 'px';
                         
                         document.body.appendChild(this.slashCommandMenu);
+                    }
+                    
+                    selectCommandItem(index) {
+                        const items = this.slashCommandMenu.querySelectorAll('.slash-command-item');
+                        
+                        // Clear previous selection
+                        items.forEach((item, i) => {
+                            if (i === index) {
+                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.classList.add('selected');
+                            } else {
+                                item.style.backgroundColor = 'transparent';
+                                item.classList.remove('selected');
+                            }
+                        });
+                        
+                        this.selectedCommandIndex = index;
                     }
                     
                     hideSlashCommands() {
@@ -2587,17 +2816,57 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }
                     
                     handleSlashCommandKeydown(event) {
+                        if (!this.slashCommandMenu) return;
+                        
+                        const visibleItems = Array.from(this.slashCommandMenu.querySelectorAll('.slash-command-item'))
+                            .filter(item => item.style.display !== 'none');
+                        
                         switch (event.key) {
                             case 'Escape':
                                 event.preventDefault();
                                 this.hideSlashCommands();
                                 break;
+                                
                             case 'Enter':
                                 event.preventDefault();
-                                // Execute first visible command
-                                const firstItem = this.slashCommandMenu.querySelector('.slash-command-item');
-                                if (firstItem) {
-                                    firstItem.click();
+                                // Execute selected command
+                                const selectedItem = this.slashCommandMenu.querySelector('.slash-command-item.selected');
+                                if (selectedItem) {
+                                    selectedItem.click();
+                                }
+                                break;
+                                
+                            case 'ArrowUp':
+                                event.preventDefault();
+                                if (visibleItems.length > 0) {
+                                    // Find current selected item in visible items
+                                    let currentVisibleIndex = visibleItems.findIndex(item => item.classList.contains('selected'));
+                                    if (currentVisibleIndex === -1) currentVisibleIndex = 0;
+                                    
+                                    let newVisibleIndex = currentVisibleIndex - 1;
+                                    if (newVisibleIndex < 0) {
+                                        newVisibleIndex = visibleItems.length - 1;
+                                    }
+                                    
+                                    const itemIndex = parseInt(visibleItems[newVisibleIndex].getAttribute('data-command-index'));
+                                    this.selectCommandItem(itemIndex);
+                                }
+                                break;
+                                
+                            case 'ArrowDown':
+                                event.preventDefault();
+                                if (visibleItems.length > 0) {
+                                    // Find current selected item in visible items
+                                    let currentVisibleIndex = visibleItems.findIndex(item => item.classList.contains('selected'));
+                                    if (currentVisibleIndex === -1) currentVisibleIndex = -1;
+                                    
+                                    let newVisibleIndex = currentVisibleIndex + 1;
+                                    if (newVisibleIndex >= visibleItems.length) {
+                                        newVisibleIndex = 0;
+                                    }
+                                    
+                                    const itemIndex = parseInt(visibleItems[newVisibleIndex].getAttribute('data-command-index'));
+                                    this.selectCommandItem(itemIndex);
                                 }
                                 break;
                         }
@@ -2609,11 +2878,24 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         }
                         
                         const items = this.slashCommandMenu.querySelectorAll('.slash-command-item');
-                        items.forEach(item => {
+                        let firstVisibleIndex = -1;
+                        let hasVisibleItems = false;
+                        
+                        items.forEach((item, index) => {
                             const text = item.textContent.toLowerCase();
                             const visible = text.includes(query.toLowerCase());
                             item.style.display = visible ? 'flex' : 'none';
+                            
+                            if (visible && firstVisibleIndex === -1) {
+                                firstVisibleIndex = index;
+                                hasVisibleItems = true;
+                            }
                         });
+                        
+                        // Auto-select first visible item after filtering
+                        if (hasVisibleItems) {
+                            this.selectCommandItem(firstVisibleIndex);
+                        }
                     }
                     
                     
