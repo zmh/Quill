@@ -39,7 +39,7 @@ struct ParagraphBlockRenderer: View {
                         } else {
                             // Create new paragraph below
                             finishEditing()
-                            // TODO: Add new block after this one
+                            // Future enhancement: Add new block after this one
                         }
                     }
                     .onAppear {

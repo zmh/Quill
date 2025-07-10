@@ -69,7 +69,6 @@ struct ContentView: View {
         .onAppear {
             // Show settings on first run
             if siteConfigs.isEmpty {
-                setupMockData()
                 showingSettings = true
             } else if let siteConfig = siteConfigs.first {
                 // Sync posts from WordPress
@@ -105,39 +104,6 @@ struct ContentView: View {
         
         modelContext.insert(post)
         selectedPost = post
-    }
-    
-    private func setupMockData() {
-        if posts.isEmpty {
-            let mockPosts = [
-                Post(
-                    title: "Getting Started with SwiftUI",
-                    content: "SwiftUI is Apple's modern declarative framework for building user interfaces across all Apple platforms. In this post, we'll explore the basics of SwiftUI and how to get started building beautiful, responsive apps.",
-                    status: .published
-                ),
-                Post(
-                    title: "The Future of Native Development",
-                    content: "As we look ahead to the future of app development, native frameworks continue to evolve. This post examines the trends and technologies shaping the next generation of native apps.",
-                    status: .draft
-                ),
-                Post(
-                    title: "Building Offline-First Apps",
-                    content: "Offline functionality is crucial for modern apps. Learn how to implement robust offline support using local databases and sync strategies.",
-                    status: .draft
-                ),
-                Post(
-                    title: "Scheduled Post: WWDC Recap",
-                    content: "This year's WWDC brought exciting announcements. Here's everything you need to know about the latest updates to Apple's platforms.",
-                    status: .scheduled
-                )
-            ]
-            
-            mockPosts.forEach { modelContext.insert($0) }
-            
-            if let firstPost = mockPosts.first {
-                selectedPost = firstPost
-            }
-        }
     }
 }
 
@@ -277,10 +243,10 @@ struct PostsListView: View {
                             password: password,
                             postID: remoteID
                         )
-                        print("Successfully deleted post from server: \(remoteID)")
+                        DebugLogger.shared.log("Successfully deleted post from server: \(remoteID)", level: .info, source: "ContentView")
                     }
                 } catch {
-                    print("Failed to delete post from server: \(error)")
+                    DebugLogger.shared.log("Failed to delete post from server: \(error)", level: .error, source: "ContentView")
                     // Continue with local deletion even if server deletion fails
                 }
                 
@@ -414,20 +380,20 @@ struct PostEditorView: View {
                 .buttonStyle(QuillButtonStyle())
                 .disabled(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges)
                 .onAppear {
-                    print("Button state - disabled: \(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges), hasUnsavedChanges: \(post.hasUnsavedChanges)")
+                    DebugLogger.shared.log("Button state - disabled: \(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
                 }
                 .onChange(of: post.hasUnsavedChanges) { oldValue, newValue in
-                    print("hasUnsavedChanges changed from \(oldValue) to \(newValue)")
+                    DebugLogger.shared.log("hasUnsavedChanges changed from \(oldValue) to \(newValue)", level: .debug, source: "ContentView")
                 }
                 .onChange(of: post.contentHash) { oldValue, newValue in
-                    print("contentHash changed from \(oldValue) to \(newValue), hasUnsavedChanges: \(post.hasUnsavedChanges), lastSyncedHash: \(post.lastSyncedHash)")
+                    DebugLogger.shared.log("contentHash changed from \(oldValue) to \(newValue), hasUnsavedChanges: \(post.hasUnsavedChanges), lastSyncedHash: \(post.lastSyncedHash)", level: .debug, source: "ContentView")
                 }
             }
         }
         .onChange(of: post.title) { _, _ in updatePost() }
         .onChange(of: post.content) { _, _ in updatePost() }
         .onChange(of: post.syncStatus) { oldStatus, newStatus in
-            print("Sync status changed from \(oldStatus) to \(newStatus), hasUnsavedChanges: \(post.hasUnsavedChanges)")
+            DebugLogger.shared.log("Sync status changed from \(oldStatus) to \(newStatus), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
         }
         .onChange(of: post.id) { _, newPostID in
             if currentPostID != newPostID {
@@ -544,12 +510,12 @@ struct PostEditorView: View {
                 // Mark as synced and update baseline hash
                 post.markAsSynced()
                 
-                print("Post successfully published: \(wordPressPost.id)")
+                DebugLogger.shared.log("Post successfully published: \(wordPressPost.id)", level: .info, source: "ContentView")
                 
             } catch {
                 publishError = error
                 showPublishError = true
-                print("Failed to publish post: \(error)")
+                DebugLogger.shared.log("Failed to publish post: \(error)", level: .error, source: "ContentView")
                 
                 // Revert status if publication failed
                 if post.remoteID == nil {
@@ -573,7 +539,7 @@ struct PostEditorView: View {
             post.slug = post.title.lowercased().replacingOccurrences(of: " ", with: "-")
         }
         
-        print("UpdatePost called - remoteID: \(post.remoteID != nil ? "exists" : "nil"), contentHash: \(post.contentHash), lastSyncedHash: \(post.lastSyncedHash), hasUnsavedChanges: \(post.hasUnsavedChanges)")
+        DebugLogger.shared.log("UpdatePost called - remoteID: \(post.remoteID != nil ? "exists" : "nil"), contentHash: \(post.contentHash), lastSyncedHash: \(post.lastSyncedHash), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
     }
     
     private func openPostOnSite() {

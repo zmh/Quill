@@ -199,7 +199,7 @@ struct SettingsView: View {
                 if let freshConfig = try? syncContext.fetch(configDescriptor).first {
                     await SyncManager.shared.syncPosts(siteConfig: freshConfig, modelContext: syncContext)
                 } else {
-                    print("Error: Could not refetch configuration for sync")
+                    DebugLogger.shared.log("Error: Could not refetch configuration for sync", level: .error, source: "SettingsView")
                 }
             }
             
@@ -237,7 +237,7 @@ struct SettingsView: View {
             }
             try modelContext.save()
         } catch {
-            print("Failed to clear all posts: \(error)")
+            DebugLogger.shared.log("Failed to clear all posts: \(error)", level: .error, source: "SettingsView")
         }
     }
     
@@ -255,7 +255,7 @@ struct SettingsView: View {
             }
             try modelContext.save()
         } catch {
-            print("Failed to clear mock posts: \(error)")
+            DebugLogger.shared.log("Failed to clear mock posts: \(error)", level: .error, source: "SettingsView")
         }
     }
 }
