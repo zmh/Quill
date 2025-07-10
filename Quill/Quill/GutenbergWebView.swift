@@ -194,9 +194,9 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 
                 /* Native-looking blocks without backgrounds */
                 .wp-block {
-                    margin: 1em 0;
+                    margin: 0.25em 0;
                     position: relative;
-                    padding: 4px;
+                    padding: 2px;
                     border-radius: 4px;
                     transition: background-color 0.15s ease;
                     max-width: 100%;
@@ -212,6 +212,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     min-height: 1.5em;
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
+                    line-height: 1.75;
                 }
                 
                 .wp-block.is-focused .wp-block-content:empty:before {
@@ -220,23 +221,128 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     font-style: italic;
                 }
                 
+                /* Paragraph blocks with minimal spacing */
                 .wp-block[data-type="core/paragraph"] {
-                    margin: 0.5em 0;
+                    margin: 0.2em 0;
                 }
                 
+                .wp-block-content p {
+                    margin: 0;
+                    line-height: 1.75;
+                }
+                
+                /* Heading blocks with reduced spacing */
                 .wp-block[data-type="core/heading"] h1,
                 .wp-block[data-type="core/heading"] h2,
                 .wp-block[data-type="core/heading"] h3,
                 .wp-block[data-type="core/heading"] h4,
                 .wp-block[data-type="core/heading"] h5,
                 .wp-block[data-type="core/heading"] h6 {
-                    margin: 0.5em 0;
+                    margin: 0.3em 0 0.2em 0;
                     font-family: var(--editor-font-family);
+                    line-height: 1.35;
                 }
                 
-                /* Image blocks */
+                /* List blocks with improved line spacing */
+                .wp-block-content ul,
+                .wp-block-content ol {
+                    margin: 0.2em 0;
+                    line-height: 1.75;
+                }
+                
+                .wp-block-content li {
+                    line-height: 1.75;
+                    margin: 0.1em 0;
+                }
+                
+                /* Code blocks with line spacing */
+                .wp-block-content pre {
+                    line-height: 1.6;
+                    margin: 0.3em 0;
+                }
+                
+                /* Quote blocks with line spacing */
+                .wp-block-content blockquote {
+                    line-height: 1.75;
+                    margin: 0.3em 0;
+                }
+                
+                /* Link styles */
+                .wp-block-content a {
+                    color: #007AFF;
+                    text-decoration: none;
+                    border-bottom: 1px solid rgba(0, 122, 255, 0.3);
+                    transition: border-color 0.2s ease;
+                }
+                
+                .wp-block-content a:hover {
+                    border-bottom-color: #007AFF;
+                }
+                
+                /* Link popover styles */
+                .link-popover {
+                    position: fixed;
+                    background: white;
+                    border: 2px solid #007AFF;
+                    border-radius: 8px;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    padding: 12px;
+                    z-index: 999999;
+                    min-width: 300px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                }
+                
+                .link-popover input {
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: 1px solid rgba(0, 0, 0, 0.1);
+                    border-radius: 6px;
+                    font-size: 14px;
+                    outline: none;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                }
+                
+                .link-popover input:focus {
+                    border-color: #007AFF;
+                    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+                }
+                
+                .link-popover-buttons {
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 8px;
+                    justify-content: flex-end;
+                }
+                
+                .link-popover button {
+                    padding: 6px 12px;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    cursor: pointer;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                }
+                
+                .link-popover button.primary {
+                    background: #007AFF;
+                    color: white;
+                }
+                
+                .link-popover button.secondary {
+                    background: rgba(0, 0, 0, 0.05);
+                    color: #333;
+                }
+                
+                .link-popover button:hover {
+                    opacity: 0.9;
+                }
+                
+                /* Image blocks with reduced spacing */
                 .wp-block[data-type="image"] figure {
-                    margin: 1em 0;
+                    margin: 0.4em 0;
                     text-align: center;
                 }
                 
@@ -248,7 +354,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 
                 /* WordPress-style image blocks */
                 .wp-block-image {
-                    margin: 1em 0;
+                    margin: 0.4em 0;
                     max-width: 100%;
                     box-sizing: border-box;
                     overflow: hidden;
@@ -742,7 +848,16 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                     
                     handleKeyDown(event, blockIndex) {
-                        window.webkit.messageHandlers.editorError.postMessage(`KeyDown event: ${event.key}, showingSlashCommands: ${this.showingSlashCommands}`);
+                        window.webkit.messageHandlers.editorError.postMessage(`KeyDown event: key="${event.key}", metaKey=${event.metaKey}, ctrlKey=${event.ctrlKey}, showingSlashCommands: ${this.showingSlashCommands}`);
+                        
+                        // Handle Cmd+K for links before other key handling
+                        if (event.key === 'k' && (event.metaKey || event.ctrlKey) && !event.shiftKey) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            window.webkit.messageHandlers.editorError.postMessage(`Cmd+K detected, showing link popover for block ${blockIndex}`);
+                            this.showLinkPopover(blockIndex);
+                            return;
+                        }
                         
                         if (this.showingSlashCommands) {
                             this.handleSlashCommandKeydown(event);
@@ -917,7 +1032,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 element.style.fontSize = '1.5em';
                                 element.style.fontStyle = 'italic';
                                 element.style.textAlign = 'center';
-                                element.style.padding = '2em 1em';
+                                element.style.padding = '1.5em 1em';
                                 element.style.borderLeft = '4px solid #666';
                                 break;
                             case 'quote':
@@ -928,7 +1043,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             case 'list':
                             case 'ordered-list':
                                 element.style.paddingLeft = '1.5em';
-                                element.style.margin = '0.5em 0';
+                                element.style.margin = '0.2em 0';
                                 break;
                         }
                     }
@@ -1605,6 +1720,214 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             text: this.content
                         };
                     }
+                    
+                    // Link handling methods
+                    showLinkPopover(blockIndex) {
+                        window.webkit.messageHandlers.editorError.postMessage(`showLinkPopover called for block ${blockIndex}`);
+                        
+                        const selection = window.getSelection();
+                        if (!selection.rangeCount) {
+                            window.webkit.messageHandlers.editorError.postMessage('No selection range count');
+                            return;
+                        }
+                        
+                        const range = selection.getRangeAt(0);
+                        const selectedText = range.toString();
+                        
+                        window.webkit.messageHandlers.editorError.postMessage(`Selection found: "${selectedText}", collapsed: ${range.collapsed}`);
+                        
+                        // If no text is selected, prompt user to select text first
+                        if (!selectedText && range.collapsed) {
+                            window.webkit.messageHandlers.editorError.postMessage('No text selected - prompting user');
+                            alert('Please select some text first to create a link');
+                            return;
+                        }
+                        
+                        // Check if we're editing an existing link
+                        let existingLink = null;
+                        let linkNode = range.startContainer;
+                        while (linkNode && linkNode !== this.blocksContainer) {
+                            if (linkNode.tagName === 'A') {
+                                existingLink = linkNode;
+                                break;
+                            }
+                            linkNode = linkNode.parentElement;
+                        }
+                        
+                        window.webkit.messageHandlers.editorError.postMessage(`About to call createLinkPopover with blockIndex=${blockIndex}, selectedText="${selectedText}"`);
+                        
+                        // Create popover
+                        try {
+                            this.createLinkPopover(blockIndex, selectedText, existingLink);
+                        } catch (error) {
+                            window.webkit.messageHandlers.editorError.postMessage(`Error in createLinkPopover: ${error.message}`);
+                        }
+                    }
+                    
+                    createLinkPopover(blockIndex, selectedText, existingLink) {
+                        window.webkit.messageHandlers.editorError.postMessage(`Creating link popover: blockIndex=${blockIndex}, selectedText="${selectedText}", hasExistingLink=${!!existingLink}`);
+                        
+                        // Remove existing popover if any
+                        this.hideLinkPopover();
+                        
+                        const popover = document.createElement('div');
+                        popover.className = 'link-popover';
+                        popover.innerHTML = `
+                            <input type="url" 
+                                   placeholder="https://example.com" 
+                                   value="${existingLink ? existingLink.href : ''}"
+                                   autocomplete="off"
+                                   spellcheck="false">
+                            <div class="link-popover-buttons">
+                                ${existingLink ? '<button class="secondary remove">Remove</button>' : ''}
+                                <button class="secondary cancel">Cancel</button>
+                                <button class="primary apply">Apply</button>
+                            </div>
+                        `;
+                        
+                        this.linkPopover = popover;
+                        this.linkBlockIndex = blockIndex;
+                        this.linkSelectedText = selectedText;
+                        this.linkExistingNode = existingLink;
+                        
+                        // Position popover
+                        const selection = window.getSelection();
+                        if (!selection.rangeCount) {
+                            window.webkit.messageHandlers.editorError.postMessage('No selection range found when positioning popover');
+                            return;
+                        }
+                        
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        
+                        // Position relative to viewport (since we're using position: fixed)
+                        const left = Math.max(10, Math.min(rect.left, window.innerWidth - 320));
+                        const top = Math.max(10, Math.min(rect.bottom + 5, window.innerHeight - 150));
+                        
+                        window.webkit.messageHandlers.editorError.postMessage(`Popover position: left=${left}, top=${top}, rect.left=${rect.left}, rect.bottom=${rect.bottom}, window dimensions: ${window.innerWidth}x${window.innerHeight}`);
+                        
+                        popover.style.left = left + 'px';
+                        popover.style.top = top + 'px';
+                        
+                        // Also add inline styles to ensure visibility
+                        popover.style.position = 'fixed';
+                        popover.style.zIndex = '999999';
+                        popover.style.backgroundColor = 'white';
+                        popover.style.border = '2px solid #007AFF';
+                        popover.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+                        
+                        // Append to container instead of body for better context
+                        this.container.appendChild(popover);
+                        window.webkit.messageHandlers.editorError.postMessage('Link popover added to editor container');
+                        
+                        // Focus input
+                        const input = popover.querySelector('input');
+                        input.focus();
+                        input.select();
+                        
+                        window.webkit.messageHandlers.editorError.postMessage('Link popover input focused');
+                        
+                        // Event handlers
+                        input.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                this.applyLink(input.value);
+                            } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                this.hideLinkPopover();
+                            }
+                        });
+                        
+                        popover.querySelector('.apply').addEventListener('click', () => {
+                            this.applyLink(input.value);
+                        });
+                        
+                        popover.querySelector('.cancel').addEventListener('click', () => {
+                            this.hideLinkPopover();
+                        });
+                        
+                        const removeBtn = popover.querySelector('.remove');
+                        if (removeBtn) {
+                            removeBtn.addEventListener('click', () => {
+                                this.removeLink();
+                            });
+                        }
+                    }
+                    
+                    applyLink(url) {
+                        if (!url || this.linkBlockIndex === undefined) {
+                            this.hideLinkPopover();
+                            return;
+                        }
+                        
+                        // Ensure URL has protocol
+                        if (!url.match(/^https?:\\/\\//)) {
+                            url = 'https://' + url;
+                        }
+                        
+                        const block = this.blocks[this.linkBlockIndex];
+                        const blockElement = this.blocksContainer.children[this.linkBlockIndex];
+                        const contentElement = blockElement.querySelector('.wp-block-content');
+                        
+                        if (this.linkExistingNode) {
+                            // Update existing link
+                            this.linkExistingNode.href = url;
+                        } else if (this.linkSelectedText) {
+                            // Create new link
+                            const selection = window.getSelection();
+                            const range = selection.getRangeAt(0);
+                            
+                            // Create link element
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.textContent = this.linkSelectedText;
+                            
+                            // Replace selection with link
+                            range.deleteContents();
+                            range.insertNode(link);
+                            
+                            // Update cursor position
+                            range.setStartAfter(link);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                        
+                        // Update block content
+                        block.content = contentElement.innerHTML;
+                        this.handleContentChange();
+                        this.hideLinkPopover();
+                    }
+                    
+                    removeLink() {
+                        if (!this.linkExistingNode || this.linkBlockIndex === undefined) {
+                            this.hideLinkPopover();
+                            return;
+                        }
+                        
+                        const block = this.blocks[this.linkBlockIndex];
+                        const blockElement = this.blocksContainer.children[this.linkBlockIndex];
+                        const contentElement = blockElement.querySelector('.wp-block-content');
+                        
+                        // Replace link with its text content
+                        const textNode = document.createTextNode(this.linkExistingNode.textContent);
+                        this.linkExistingNode.parentNode.replaceChild(textNode, this.linkExistingNode);
+                        
+                        // Update block content
+                        block.content = contentElement.innerHTML;
+                        this.handleContentChange();
+                        this.hideLinkPopover();
+                    }
+                    
+                    hideLinkPopover() {
+                        if (this.linkPopover && this.linkPopover.parentNode) {
+                            this.linkPopover.parentNode.removeChild(this.linkPopover);
+                            this.linkPopover = null;
+                            this.linkBlockIndex = undefined;
+                            this.linkSelectedText = null;
+                            this.linkExistingNode = null;
+                        }
+                    }
                 }
                 
                 // Initialize editor when DOM is ready
@@ -1705,6 +2028,77 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         private func handleEditorReady() {
             parent.isLoading = false
             parent.hasError = false
+            
+            // Add additional keyboard shortcut handling after editor is ready
+            if let webView = parent.webViewRef {
+                let script = """
+                    // Add additional Cmd+K listener after editor is ready
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'k' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            window.webkit.messageHandlers.editorError.postMessage('Editor-ready Cmd+K detected - using simple prompt');
+                            
+                            const selection = window.getSelection();
+                            if (!selection.rangeCount || selection.isCollapsed) {
+                                alert('Please select some text first to create a link');
+                                return false;
+                            }
+                            
+                            const selectedText = selection.toString();
+                            const url = prompt('Enter URL for "' + selectedText + '":', 'https://');
+                            
+                            if (url && url !== '' && url !== 'https://') {
+                                try {
+                                    const range = selection.getRangeAt(0);
+                                    
+                                    // Create link element
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.textContent = selectedText;
+                                    
+                                    // Replace selection with link
+                                    range.deleteContents();
+                                    range.insertNode(link);
+                                    
+                                    // Update content
+                                    if (window.gutenbergEditor) {
+                                        // Find which block was edited
+                                        let blockElement = link.parentElement;
+                                        while (blockElement && !blockElement.classList.contains('wp-block')) {
+                                            blockElement = blockElement.parentElement;
+                                        }
+                                        
+                                        if (blockElement) {
+                                            const blockIndex = parseInt(blockElement.getAttribute('data-block-index'));
+                                            const contentElement = blockElement.querySelector('.wp-block-content');
+                                            if (window.gutenbergEditor.blocks[blockIndex] && contentElement) {
+                                                window.gutenbergEditor.blocks[blockIndex].content = contentElement.innerHTML;
+                                                window.gutenbergEditor.handleContentChange();
+                                            }
+                                        }
+                                    }
+                                    
+                                    window.webkit.messageHandlers.editorError.postMessage(`Link created: ${url}`);
+                                } catch (error) {
+                                    window.webkit.messageHandlers.editorError.postMessage(`Error creating link: ${error.message}`);
+                                }
+                            }
+                            
+                            return false;
+                        }
+                    }, true);
+                    
+                    window.webkit.messageHandlers.editorError.postMessage('Added editor-ready Cmd+K listener');
+                """
+                
+                webView.evaluateJavaScript(script) { _, error in
+                    if let error = error {
+                        DebugLogger.shared.log("Failed to add Cmd+K listener: \(error)", level: .error, source: "WebView")
+                    }
+                }
+            }
         }
         
         private func handleEditorError(_ body: Any) {
@@ -1750,7 +2144,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         private func handleImagePickerRequest(_ body: Any) {
             guard let data = body as? [String: Any],
                   let blockIndex = data["blockIndex"] as? Int,
-                  let blockId = data["blockId"] as? String else {
+                  let _ = data["blockId"] as? String else {
                 DebugLogger.shared.log("Invalid image picker request data", level: .error, source: "WebView")
                 return
             }
@@ -1884,6 +2278,41 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             #endif
         }
         
+        // MARK: - WKUIDelegate for macOS
+        
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            let alert = NSAlert()
+            alert.messageText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            completionHandler()
+        }
+        
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+            let alert = NSAlert()
+            alert.messageText = "Add Link"
+            alert.informativeText = prompt
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Add")
+            alert.addButton(withTitle: "Cancel")
+            
+            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+            input.stringValue = defaultText ?? "https://"
+            input.placeholderString = "https://example.com"
+            alert.accessoryView = input
+            
+            // Focus the text field and select all text
+            alert.window.initialFirstResponder = input
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                completionHandler(input.stringValue)
+            } else {
+                completionHandler(nil)
+            }
+        }
+        
         // MARK: - Content Management
         
         func updateContent(_ content: String) {
@@ -1896,6 +2325,44 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             
             // Execute script (would need web view reference)
             // This is a simplified approach - full implementation would need proper web view access
+        }
+        
+        // MARK: - WKUIDelegate
+        
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                completionHandler()
+            })
+            
+            if let viewController = parent.webViewRef?.window?.rootViewController {
+                viewController.present(alert, animated: true)
+            } else {
+                completionHandler()
+            }
+        }
+        
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+            let alert = UIAlertController(title: "Add Link", message: prompt, preferredStyle: .alert)
+            
+            alert.addTextField { textField in
+                textField.text = defaultText
+                textField.placeholder = "https://example.com"
+            }
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+                completionHandler(nil)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Add", style: .default) { _ in
+                completionHandler(alert.textFields?.first?.text)
+            })
+            
+            if let viewController = parent.webViewRef?.window?.rootViewController {
+                viewController.present(alert, animated: true)
+            } else {
+                completionHandler(nil)
+            }
         }
         
         // MARK: - Native Context Menu Support
@@ -2173,7 +2640,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 
                 /* Native-looking blocks without backgrounds */
                 .wp-block {
-                    margin: 1em 0;
+                    margin: 0.4em 0;
                     position: relative;
                     padding: 4px;
                     border-radius: 4px;
@@ -2191,6 +2658,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     min-height: 1.5em;
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
+                    line-height: 1.6;
                 }
                 
                 .wp-block.is-focused .wp-block-content:empty:before {
@@ -2204,14 +2672,32 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     font-family: var(--editor-font-family);
                 }
                 
+                /* Better paragraph spacing */
+                p {
+                    margin: 0;
+                    line-height: 1.6;
+                }
+                
+                /* List items with better spacing */
+                ul, ol {
+                    margin: 0.3em 0;
+                    padding-left: 1.5em;
+                }
+                
+                li {
+                    line-height: 1.6;
+                    margin: 0.2em 0;
+                }
+                
                 /* Code blocks should always use monospace */
                 pre.wp-block-content {
                     font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+                    line-height: 1.4;
                 }
                 
                 /* Image blocks */
                 .wp-block[data-type="image"] figure {
-                    margin: 1em 0;
+                    margin: 0.6em 0;
                     text-align: center;
                 }
                 
@@ -2223,7 +2709,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 
                 /* WordPress-style image blocks */
                 .wp-block-image {
-                    margin: 1em 0;
+                    margin: 0.6em 0;
                     max-width: 100%;
                     box-sizing: border-box;
                     overflow: hidden;
@@ -2808,7 +3294,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 element.style.fontSize = '1.5em';
                                 element.style.fontStyle = 'italic';
                                 element.style.textAlign = 'center';
-                                element.style.padding = '2em 1em';
+                                element.style.padding = '1.5em 1em';
                                 element.style.borderLeft = '4px solid #666';
                                 break;
                             case 'quote':
@@ -2819,7 +3305,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             case 'list':
                             case 'ordered-list':
                                 element.style.paddingLeft = '1.5em';
-                                element.style.margin = '0.5em 0';
+                                element.style.margin = '0.2em 0';
                                 break;
                         }
                     }
@@ -3679,6 +4165,77 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         private func handleEditorReady() {
             parent.isLoading = false
             parent.hasError = false
+            
+            // Add additional keyboard shortcut handling after editor is ready
+            if let webView = parent.webViewRef {
+                let script = """
+                    // Add additional Cmd+K listener after editor is ready
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'k' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            window.webkit.messageHandlers.editorError.postMessage('Editor-ready Cmd+K detected - using simple prompt');
+                            
+                            const selection = window.getSelection();
+                            if (!selection.rangeCount || selection.isCollapsed) {
+                                alert('Please select some text first to create a link');
+                                return false;
+                            }
+                            
+                            const selectedText = selection.toString();
+                            const url = prompt('Enter URL for "' + selectedText + '":', 'https://');
+                            
+                            if (url && url !== '' && url !== 'https://') {
+                                try {
+                                    const range = selection.getRangeAt(0);
+                                    
+                                    // Create link element
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.textContent = selectedText;
+                                    
+                                    // Replace selection with link
+                                    range.deleteContents();
+                                    range.insertNode(link);
+                                    
+                                    // Update content
+                                    if (window.gutenbergEditor) {
+                                        // Find which block was edited
+                                        let blockElement = link.parentElement;
+                                        while (blockElement && !blockElement.classList.contains('wp-block')) {
+                                            blockElement = blockElement.parentElement;
+                                        }
+                                        
+                                        if (blockElement) {
+                                            const blockIndex = parseInt(blockElement.getAttribute('data-block-index'));
+                                            const contentElement = blockElement.querySelector('.wp-block-content');
+                                            if (window.gutenbergEditor.blocks[blockIndex] && contentElement) {
+                                                window.gutenbergEditor.blocks[blockIndex].content = contentElement.innerHTML;
+                                                window.gutenbergEditor.handleContentChange();
+                                            }
+                                        }
+                                    }
+                                    
+                                    window.webkit.messageHandlers.editorError.postMessage(`Link created: ${url}`);
+                                } catch (error) {
+                                    window.webkit.messageHandlers.editorError.postMessage(`Error creating link: ${error.message}`);
+                                }
+                            }
+                            
+                            return false;
+                        }
+                    }, true);
+                    
+                    window.webkit.messageHandlers.editorError.postMessage('Added editor-ready Cmd+K listener');
+                """
+                
+                webView.evaluateJavaScript(script) { _, error in
+                    if let error = error {
+                        DebugLogger.shared.log("Failed to add Cmd+K listener: \(error)", level: .error, source: "WebView")
+                    }
+                }
+            }
         }
         
         private func handleEditorError(_ body: Any) {
@@ -3724,7 +4281,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         private func handleImagePickerRequest(_ body: Any) {
             guard let data = body as? [String: Any],
                   let blockIndex = data["blockIndex"] as? Int,
-                  let blockId = data["blockId"] as? String else {
+                  let _ = data["blockId"] as? String else {
                 DebugLogger.shared.log("Invalid image picker request data", level: .error, source: "WebView")
                 return
             }
@@ -3861,6 +4418,70 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         func updateContent(_ content: String) {
             // Update editor content through JavaScript
             // This would be implemented with proper WebView reference
+        }
+        
+        // MARK: - WKUIDelegate Methods for JavaScript Dialogs
+        
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            #if os(macOS)
+            let alert = NSAlert()
+            alert.messageText = "Alert"
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            completionHandler()
+            #else
+            // iOS implementation would use UIAlertController
+            completionHandler()
+            #endif
+        }
+        
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+            #if os(macOS)
+            let alert = NSAlert()
+            alert.messageText = "Add Link"
+            alert.informativeText = prompt
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+            
+            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+            input.stringValue = defaultText ?? ""
+            input.placeholderString = "https://"
+            alert.accessoryView = input
+            
+            // Focus the text field and select all text
+            alert.window.initialFirstResponder = input
+            input.selectText(nil)
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                completionHandler(input.stringValue)
+            } else {
+                completionHandler(nil)
+            }
+            #else
+            // iOS implementation would use UIAlertController
+            completionHandler(defaultText)
+            #endif
+        }
+        
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            #if os(macOS)
+            let alert = NSAlert()
+            alert.messageText = "Confirm"
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+            
+            let response = alert.runModal()
+            completionHandler(response == .alertFirstButtonReturn)
+            #else
+            // iOS implementation would use UIAlertController
+            completionHandler(true)
+            #endif
         }
         
         // MARK: - Native Context Menu Support

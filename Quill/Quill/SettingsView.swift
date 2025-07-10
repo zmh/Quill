@@ -594,13 +594,14 @@ struct DebugLogView: View {
             
             // Log entries
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 1) {
                     ForEach(filteredLogs) { log in
                         LogEntryView(entry: log)
                     }
                 }
+                .padding(4)
             }
-            .frame(maxHeight: 300)
+            .frame(maxHeight: 250)
             .background(Color.black.opacity(0.05))
             .cornerRadius(8)
             
@@ -608,7 +609,7 @@ struct DebugLogView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-        .padding(20)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -617,37 +618,41 @@ struct LogEntryView: View {
     let entry: LogEntry
     
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 4) {
             // Timestamp
             Text(entry.timestamp, format: .dateTime.hour().minute().second())
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 9, design: .monospaced))
                 .foregroundColor(.secondary)
-                .frame(width: 60, alignment: .leading)
+                .frame(minWidth: 50)
             
             // Level badge
             Text(entry.level.rawValue)
-                .font(.system(size: 9, weight: .semibold))
-                .padding(.horizontal, 4)
+                .font(.system(size: 8, weight: .semibold))
+                .padding(.horizontal, 3)
                 .padding(.vertical, 1)
                 .background(levelColor(entry.level))
                 .foregroundColor(.white)
-                .cornerRadius(3)
-                .frame(width: 45)
+                .cornerRadius(2)
+                .frame(minWidth: 35)
             
             // Source
-            Text(entry.source)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.secondary)
-                .frame(width: 80, alignment: .leading)
+            if !entry.source.isEmpty {
+                Text(entry.source)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .frame(minWidth: 60)
+                    .lineLimit(1)
+            }
             
             // Message
             Text(entry.message)
-                .font(.system(size: 11, design: .monospaced))
-                .lineLimit(3)
+                .font(.system(size: 10, design: .monospaced))
+                .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
         .background(entry.level == .error ? Color.red.opacity(0.1) : Color.clear)
     }
     

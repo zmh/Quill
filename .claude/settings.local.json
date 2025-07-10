@@ -16,7 +16,8 @@
       "Bash(sips:*)",
       "Bash(git commit:*)",
       "Bash(rg:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git restore:*)"
     ]
   },
   "enableAllProjectMcpServers": false

@@ -24,14 +24,17 @@ struct DebugView: View {
                 Button("Clear") {
                     logger.clear()
                 }
+                .buttonStyle(.borderless)
                 
                 Button("Export") {
                     let logs = logger.exportLogs()
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(logs, forType: .string)
                 }
+                .buttonStyle(.borderless)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(Color(NSColor.controlBackgroundColor))
             
             Divider()
@@ -74,7 +77,6 @@ struct DebugView: View {
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 400)
     }
 }
 
@@ -82,27 +84,32 @@ struct DebugLogRow: View {
     let entry: LogEntry
     
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 4) {
             Text(timeString)
-                .font(.system(.caption, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundColor(.secondary)
+                .frame(minWidth: 65)
             
-            Text("[\(entry.level.rawValue)]")
-                .font(.system(.caption, design: .monospaced))
+            Text(entry.level.rawValue.prefix(4))
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundColor(levelColor)
+                .frame(width: 35)
             
             if !entry.source.isEmpty {
-                Text("[\(entry.source)]")
-                    .font(.system(.caption, design: .monospaced))
+                Text(entry.source)
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .frame(minWidth: 60, maxWidth: 80)
             }
             
             Text(entry.message)
-                .font(.system(.caption, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .textSelection(.enabled)
-            
-            Spacer()
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 8)
         .padding(.vertical, 1)
     }
     
