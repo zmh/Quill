@@ -150,6 +150,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Gutenberg Editor</title>
+            <!-- Cache bust: v5.0 Professional blue link colors -->
             <style>
                 :root {
                     --editor-font-family: \({
@@ -163,6 +164,56 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         }
                     }());
                     --editor-font-size: \(fontSize)px;
+                    
+                    /* Light mode colors */
+                    --bg-color: #ffffff;
+                    --text-color: #000000;
+                    --secondary-text: #666666;
+                    --placeholder-color: #999999;
+                    --link-color: #0066CC;
+                    --code-bg: #f5f5f5;
+                    --quote-border: #ddd;
+                    --pullquote-border: #666;
+                    --popover-bg: rgba(255, 255, 255, 0.95);
+                    --popover-border: #0066CC;
+                    --popover-shadow: rgba(0, 0, 0, 0.3);
+                    --button-secondary-bg: rgba(0, 0, 0, 0.05);
+                    --button-secondary-text: #333;
+                    --input-border: rgba(0, 0, 0, 0.1);
+                    --slash-menu-bg: rgba(255, 255, 255, 0.95);
+                    --slash-menu-border: rgba(0, 0, 0, 0.1);
+                    --slash-menu-shadow: rgba(0, 0, 0, 0.12);
+                    --slash-menu-hover: rgba(0, 102, 204, 0.08);
+                    --slash-menu-text: #1d1d1f;
+                    --image-error-bg: #ffebee;
+                    --image-error-text: #c62828;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    :root {
+                        /* Dark mode colors */
+                        --bg-color: #1e1e1e;
+                        --text-color: #ffffff;
+                        --secondary-text: #999999;
+                        --placeholder-color: #666666;
+                        --link-color: #66B3FF;
+                        --code-bg: #2d2d2d;
+                        --quote-border: #555;
+                        --pullquote-border: #999;
+                        --popover-bg: rgba(40, 40, 40, 0.95);
+                        --popover-border: #66B3FF;
+                        --popover-shadow: rgba(0, 0, 0, 0.5);
+                        --button-secondary-bg: rgba(255, 255, 255, 0.1);
+                        --button-secondary-text: #ddd;
+                        --input-border: rgba(255, 255, 255, 0.2);
+                        --slash-menu-bg: rgba(40, 40, 40, 0.95);
+                        --slash-menu-border: rgba(255, 255, 255, 0.2);
+                        --slash-menu-shadow: rgba(0, 0, 0, 0.3);
+                        --slash-menu-hover: rgba(102, 179, 255, 0.15);
+                        --slash-menu-text: #ffffff;
+                        --image-error-bg: #5c2828;
+                        --image-error-text: #ff9999;
+                    }
                 }
                 
                 body {
@@ -170,7 +221,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     padding: 20px;
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
-                    background-color: #ffffff;
+                    background-color: var(--bg-color);
+                    color: var(--text-color);
                     overflow-x: hidden;
                 }
                 
@@ -181,7 +233,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 }
                 
                 .wp-block-editor__container {
-                    background: #fff;
+                    background: var(--bg-color);
                     max-width: 100%;
                     overflow-x: hidden;
                 }
@@ -217,7 +269,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 
                 .wp-block.is-focused .wp-block-content:empty:before {
                     content: "Type / for commands";
-                    color: #999;
+                    color: var(--placeholder-color);
                     font-style: italic;
                 }
                 
@@ -267,25 +319,66 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     margin: 0.3em 0;
                 }
                 
-                /* Link styles */
-                .wp-block-content a {
-                    color: #007AFF;
-                    text-decoration: none;
-                    border-bottom: 1px solid rgba(0, 122, 255, 0.3);
-                    transition: border-color 0.2s ease;
+                /* Link styles - v5.0 - Professional blue colors for visibility */
+                a, 
+                .wp-block-content a,
+                .wp-block a,
+                p a,
+                div a,
+                span a,
+                [contenteditable] a {
+                    color: #0066FF !important;
+                    text-decoration: underline !important;
+                    text-decoration-color: #0066FF !important;
+                    border-bottom: none !important;
+                    font-weight: 500 !important;
+                    transition: color 0.2s ease !important;
                 }
                 
-                .wp-block-content a:hover {
-                    border-bottom-color: #007AFF;
+                @media (prefers-color-scheme: dark) {
+                    a, 
+                    .wp-block-content a,
+                    .wp-block a,
+                    p a,
+                    div a,
+                    span a,
+                    [contenteditable] a {
+                        color: #4DA6FF !important;
+                        text-decoration-color: #4DA6FF !important;
+                    }
+                }
+                
+                a:hover, 
+                .wp-block-content a:hover,
+                .wp-block a:hover,
+                p a:hover,
+                div a:hover,
+                span a:hover,
+                [contenteditable] a:hover {
+                    color: #0052CC !important;
+                    text-decoration-color: #0052CC !important;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    a:hover, 
+                    .wp-block-content a:hover,
+                    .wp-block a:hover,
+                    p a:hover,
+                    div a:hover,
+                    span a:hover,
+                    [contenteditable] a:hover {
+                        color: #66B3FF !important;
+                        text-decoration-color: #66B3FF !important;
+                    }
                 }
                 
                 /* Link popover styles */
                 .link-popover {
                     position: fixed;
-                    background: white;
-                    border: 2px solid #007AFF;
+                    background: var(--popover-bg);
+                    border: 2px solid var(--popover-border);
                     border-radius: 8px;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    box-shadow: 0 8px 32px var(--popover-shadow);
                     padding: 12px;
                     z-index: 999999;
                     min-width: 300px;
@@ -298,16 +391,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 .link-popover input {
                     width: 100%;
                     padding: 8px 12px;
-                    border: 1px solid rgba(0, 0, 0, 0.1);
+                    border: 1px solid var(--input-border);
                     border-radius: 6px;
                     font-size: 14px;
                     outline: none;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                    background: var(--bg-color);
+                    color: var(--text-color);
                 }
                 
                 .link-popover input:focus {
-                    border-color: #007AFF;
-                    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+                    border-color: var(--link-color);
+                    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
                 }
                 
                 .link-popover-buttons {
@@ -327,13 +422,13 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 }
                 
                 .link-popover button.primary {
-                    background: #007AFF;
+                    background: var(--link-color);
                     color: white;
                 }
                 
                 .link-popover button.secondary {
-                    background: rgba(0, 0, 0, 0.05);
-                    color: #333;
+                    background: var(--button-secondary-bg);
+                    color: var(--button-secondary-text);
                 }
                 
                 .link-popover button:hover {
@@ -1023,7 +1118,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     applyBlockAttributes(element, block) {
                         switch (block.type) {
                             case 'code':
-                                element.style.backgroundColor = '#f5f5f5';
+                                element.style.backgroundColor = 'var(--code-bg)';
                                 element.style.padding = '1em';
                                 element.style.fontFamily = 'monospace';
                                 element.style.borderRadius = '4px';
@@ -1033,10 +1128,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 element.style.fontStyle = 'italic';
                                 element.style.textAlign = 'center';
                                 element.style.padding = '1.5em 1em';
-                                element.style.borderLeft = '4px solid #666';
+                                element.style.borderLeft = '4px solid var(--pullquote-border)';
                                 break;
                             case 'quote':
-                                element.style.borderLeft = '4px solid #ddd';
+                                element.style.borderLeft = '4px solid var(--quote-border)';
                                 element.style.paddingLeft = '1em';
                                 element.style.fontStyle = 'italic';
                                 break;
@@ -1291,11 +1386,11 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.slashCommandMenu.className = 'slash-command-menu';
                         this.slashCommandMenu.style.cssText = `
                             position: absolute;
-                            background: rgba(255, 255, 255, 0.95);
+                            background: var(--slash-menu-bg);
                             backdrop-filter: blur(20px);
-                            border: 1px solid rgba(0, 0, 0, 0.1);
+                            border: 1px solid var(--slash-menu-border);
                             border-radius: 8px;
-                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+                            box-shadow: 0 8px 32px var(--slash-menu-shadow);
                             padding: 4px 0;
                             z-index: 1000;
                             min-width: 240px;
@@ -1319,14 +1414,14 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 align-items: center;
                                 gap: 12px;
                                 font-size: 13px;
-                                color: #1d1d1f;
+                                color: var(--slash-menu-text);
                                 transition: background-color 0.1s ease;
                                 margin: 2px 0;
                             `;
                             
                             // Auto-select first item
                             if (index === 0) {
-                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.style.backgroundColor = 'var(--slash-menu-hover)';
                                 item.classList.add('selected');
                             }
                             
@@ -1361,7 +1456,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         // Clear previous selection
                         items.forEach((item, i) => {
                             if (i === index) {
-                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.style.backgroundColor = 'var(--slash-menu-hover)';
                                 item.classList.add('selected');
                             } else {
                                 item.style.backgroundColor = 'transparent';
@@ -2240,7 +2335,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                         if let webView = self.parent.webViewRef {
                                             let errorScript = """
                                                 if (window.gutenbergEditor) {
-                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: #ffebee; color: #c62828; border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: var(--image-error-bg); color: var(--image-error-text); border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
                                                     window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
                                                         error: true,
                                                         uploading: false
@@ -2596,6 +2691,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Gutenberg Editor</title>
+            <!-- Cache bust: v5.0 Professional blue link colors -->
             <style>
                 :root {
                     --editor-font-family: \({
@@ -2609,6 +2705,56 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         }
                     }());
                     --editor-font-size: \(fontSize)px;
+                    
+                    /* Light mode colors */
+                    --bg-color: #ffffff;
+                    --text-color: #000000;
+                    --secondary-text: #666666;
+                    --placeholder-color: #999999;
+                    --link-color: #0066CC;
+                    --code-bg: #f5f5f5;
+                    --quote-border: #ddd;
+                    --pullquote-border: #666;
+                    --popover-bg: rgba(255, 255, 255, 0.95);
+                    --popover-border: #0066CC;
+                    --popover-shadow: rgba(0, 0, 0, 0.3);
+                    --button-secondary-bg: rgba(0, 0, 0, 0.05);
+                    --button-secondary-text: #333;
+                    --input-border: rgba(0, 0, 0, 0.1);
+                    --slash-menu-bg: rgba(255, 255, 255, 0.95);
+                    --slash-menu-border: rgba(0, 0, 0, 0.1);
+                    --slash-menu-shadow: rgba(0, 0, 0, 0.12);
+                    --slash-menu-hover: rgba(0, 102, 204, 0.08);
+                    --slash-menu-text: #1d1d1f;
+                    --image-error-bg: #ffebee;
+                    --image-error-text: #c62828;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    :root {
+                        /* Dark mode colors */
+                        --bg-color: #1e1e1e;
+                        --text-color: #ffffff;
+                        --secondary-text: #999999;
+                        --placeholder-color: #666666;
+                        --link-color: #66B3FF;
+                        --code-bg: #2d2d2d;
+                        --quote-border: #555;
+                        --pullquote-border: #999;
+                        --popover-bg: rgba(40, 40, 40, 0.95);
+                        --popover-border: #66B3FF;
+                        --popover-shadow: rgba(0, 0, 0, 0.5);
+                        --button-secondary-bg: rgba(255, 255, 255, 0.1);
+                        --button-secondary-text: #ddd;
+                        --input-border: rgba(255, 255, 255, 0.2);
+                        --slash-menu-bg: rgba(40, 40, 40, 0.95);
+                        --slash-menu-border: rgba(255, 255, 255, 0.2);
+                        --slash-menu-shadow: rgba(0, 0, 0, 0.3);
+                        --slash-menu-hover: rgba(102, 179, 255, 0.15);
+                        --slash-menu-text: #ffffff;
+                        --image-error-bg: #5c2828;
+                        --image-error-text: #ff9999;
+                    }
                 }
                 
                 body {
@@ -2616,7 +2762,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     padding: 20px;
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
-                    background-color: #ffffff;
+                    background-color: var(--bg-color);
+                    color: var(--text-color);
                     overflow-x: hidden;
                 }
                 
@@ -2627,7 +2774,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 }
                 
                 .wp-block-editor__container {
-                    background: #fff;
+                    background: var(--bg-color);
                     max-width: 100%;
                     overflow-x: hidden;
                 }
@@ -2663,7 +2810,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 
                 .wp-block.is-focused .wp-block-content:empty:before {
                     content: "Type / for commands";
-                    color: #999;
+                    color: var(--placeholder-color);
                     font-style: italic;
                 }
                 
@@ -2808,6 +2955,59 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     background-color: #ffebee;
                     border-radius: 8px;
                     margin: 20px;
+                }
+                
+                /* Link styles - v5.0 - Professional blue colors for visibility */
+                a, 
+                .wp-block-content a,
+                .wp-block a,
+                p a,
+                div a,
+                span a,
+                [contenteditable] a {
+                    color: #0066FF !important;
+                    text-decoration: underline !important;
+                    text-decoration-color: #0066FF !important;
+                    border-bottom: none !important;
+                    font-weight: 500 !important;
+                    transition: color 0.2s ease !important;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    a, 
+                    .wp-block-content a,
+                    .wp-block a,
+                    p a,
+                    div a,
+                    span a,
+                    [contenteditable] a {
+                        color: #4DA6FF !important;
+                        text-decoration-color: #4DA6FF !important;
+                    }
+                }
+                
+                a:hover, 
+                .wp-block-content a:hover,
+                .wp-block a:hover,
+                p a:hover,
+                div a:hover,
+                span a:hover,
+                [contenteditable] a:hover {
+                    color: #0052CC !important;
+                    text-decoration-color: #0052CC !important;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    a:hover, 
+                    .wp-block-content a:hover,
+                    .wp-block a:hover,
+                    p a:hover,
+                    div a:hover,
+                    span a:hover,
+                    [contenteditable] a:hover {
+                        color: #66B3FF !important;
+                        text-decoration-color: #66B3FF !important;
+                    }
                 }
             </style>
         </head>
@@ -3285,7 +3485,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     applyBlockAttributes(element, block) {
                         switch (block.type) {
                             case 'code':
-                                element.style.backgroundColor = '#f5f5f5';
+                                element.style.backgroundColor = 'var(--code-bg)';
                                 element.style.padding = '1em';
                                 element.style.fontFamily = 'monospace';
                                 element.style.borderRadius = '4px';
@@ -3295,10 +3495,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 element.style.fontStyle = 'italic';
                                 element.style.textAlign = 'center';
                                 element.style.padding = '1.5em 1em';
-                                element.style.borderLeft = '4px solid #666';
+                                element.style.borderLeft = '4px solid var(--pullquote-border)';
                                 break;
                             case 'quote':
-                                element.style.borderLeft = '4px solid #ddd';
+                                element.style.borderLeft = '4px solid var(--quote-border)';
                                 element.style.paddingLeft = '1em';
                                 element.style.fontStyle = 'italic';
                                 break;
@@ -3642,11 +3842,11 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.slashCommandMenu.className = 'slash-command-menu';
                         this.slashCommandMenu.style.cssText = `
                             position: absolute;
-                            background: rgba(255, 255, 255, 0.95);
+                            background: var(--slash-menu-bg);
                             backdrop-filter: blur(20px);
-                            border: 1px solid rgba(0, 0, 0, 0.1);
+                            border: 1px solid var(--slash-menu-border);
                             border-radius: 8px;
-                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+                            box-shadow: 0 8px 32px var(--slash-menu-shadow);
                             padding: 4px 0;
                             z-index: 1000;
                             min-width: 240px;
@@ -3670,14 +3870,14 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 align-items: center;
                                 gap: 12px;
                                 font-size: 13px;
-                                color: #1d1d1f;
+                                color: var(--slash-menu-text);
                                 transition: background-color 0.1s ease;
                                 margin: 2px 0;
                             `;
                             
                             // Auto-select first item
                             if (index === 0) {
-                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.style.backgroundColor = 'var(--slash-menu-hover)';
                                 item.classList.add('selected');
                             }
                             
@@ -3712,7 +3912,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         // Clear previous selection
                         items.forEach((item, i) => {
                             if (i === index) {
-                                item.style.backgroundColor = 'rgba(0, 122, 255, 0.08)';
+                                item.style.backgroundColor = 'var(--slash-menu-hover)';
                                 item.classList.add('selected');
                             } else {
                                 item.style.backgroundColor = 'transparent';
@@ -4377,7 +4577,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                         if let webView = self.parent.webViewRef {
                                             let errorScript = """
                                                 if (window.gutenbergEditor) {
-                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: #ffebee; color: #c62828; border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
+                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: var(--image-error-bg); color: var(--image-error-text); border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
                                                     window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
                                                         error: true,
                                                         uploading: false

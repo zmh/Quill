@@ -409,16 +409,7 @@ struct PostEditorView: View {
                 }
                 
                 Button(action: { publishPost() }) {
-                    if isPublishing {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .scaleEffect(0.8)
-                            Text("Publishing...")
-                        }
-                    } else {
-                        Text(getButtonText())
-                    }
+                    Text(isPublishing ? "Publishing..." : getButtonText())
                 }
                 .buttonStyle(QuillButtonStyle())
                 .disabled(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges)
