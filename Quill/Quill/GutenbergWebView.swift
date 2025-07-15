@@ -1692,28 +1692,95 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     
                     // HTML Parsing
                     parseHTMLToBlocks(html) {
-                        const div = document.createElement('div');
-                        div.innerHTML = html;
                         const blocks = [];
                         
-                        Array.from(div.children).forEach(element => {
-                            const block = this.elementToBlock(element);
-                            if (block) {
-                                blocks.push(block);
-                            }
-                        });
-                        
-                        // If no blocks found, create paragraph blocks from text content
-                        if (blocks.length === 0 && html.trim()) {
-                            const paragraphs = html.split('\\n\\n').filter(p => p.trim());
-                            paragraphs.forEach(p => {
+                        // Check if content has WordPress block comments
+                        if (html.includes('<!-- wp:')) {
+                            // Parse WordPress block format
+                            const blockRegex = /<!-- wp:([a-z-]+)(?:\\s+(\\{[^}]*\\}))? -->\\n?([\\s\\S]*?)\\n?<!-- \\/wp:\\1 -->/g;
+                            let match;
+                            
+                            while ((match = blockRegex.exec(html)) !== null) {
+                                const [fullMatch, blockName, attrsJson, content] = match;
+                                let type = 'paragraph';
+                                let attributes = {};
+                                
+                                // Parse attributes if present
+                                if (attrsJson) {
+                                    try {
+                                        attributes = JSON.parse(attrsJson);
+                                    } catch (e) {
+                                        console.error('Failed to parse block attributes:', e);
+                                    }
+                                }
+                                
+                                // Map WordPress block names to our types
+                                switch (blockName) {
+                                    case 'paragraph':
+                                        type = 'paragraph';
+                                        break;
+                                    case 'heading':
+                                        const level = attributes.level || 2;
+                                        type = `heading-${level}`;
+                                        break;
+                                    case 'list':
+                                        type = attributes.ordered ? 'ordered-list' : 'list';
+                                        break;
+                                    case 'quote':
+                                        type = 'quote';
+                                        break;
+                                    case 'pullquote':
+                                        type = 'pullquote';
+                                        break;
+                                    case 'code':
+                                        type = 'code';
+                                        break;
+                                    case 'image':
+                                        type = 'image';
+                                        // Extract image URL from content
+                                        const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/);
+                                        if (imgMatch) {
+                                            attributes.url = imgMatch[1];
+                                        }
+                                        break;
+                                }
+                                
+                                // Extract inner content from HTML tags
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = content;
+                                const innerContent = tempDiv.querySelector('p, h1, h2, h3, h4, h5, h6, pre, blockquote, ul, ol, figure');
+                                
                                 blocks.push({
                                     id: this.generateBlockId(),
-                                    type: 'paragraph',
-                                    content: p.trim(),
-                                    attributes: {}
+                                    type: type,
+                                    content: innerContent ? innerContent.innerHTML : content,
+                                    attributes: attributes
                                 });
+                            }
+                        } else {
+                            // Fallback to parsing regular HTML
+                            const div = document.createElement('div');
+                            div.innerHTML = html;
+                            
+                            Array.from(div.children).forEach(element => {
+                                const block = this.elementToBlock(element);
+                                if (block) {
+                                    blocks.push(block);
+                                }
                             });
+                            
+                            // If no blocks found, create paragraph blocks from text content
+                            if (blocks.length === 0 && html.trim()) {
+                                const paragraphs = html.split('\\n\\n').filter(p => p.trim());
+                                paragraphs.forEach(p => {
+                                    blocks.push({
+                                        id: this.generateBlockId(),
+                                        type: 'paragraph',
+                                        content: p.trim(),
+                                        attributes: {}
+                                    });
+                                });
+                            }
                         }
                         
                         return blocks;
@@ -2022,6 +2089,94 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             this.linkSelectedText = null;
                             this.linkExistingNode = null;
                         }
+                    }
+                    
+                    // Serialize blocks to WordPress format with block comments
+                    handleContentChange() {
+                        const wpContent = this.serializeBlocksToWordPress();
+                        window.webkit.messageHandlers.contentUpdate.postMessage({
+                            html: wpContent,
+                            text: this.content
+                        });
+                    }
+                    
+                    serializeBlocksToWordPress() {
+                        return this.blocks.map(block => {
+                            let blockName = '';
+                            let attrs = '';
+                            
+                            // Map block types to WordPress block names
+                            switch (block.type) {
+                                case 'paragraph':
+                                    blockName = 'paragraph';
+                                    break;
+                                case 'heading-1':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":1}';
+                                    break;
+                                case 'heading-2':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":2}';
+                                    break;
+                                case 'heading-3':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":3}';
+                                    break;
+                                case 'heading-4':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":4}';
+                                    break;
+                                case 'heading-5':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":5}';
+                                    break;
+                                case 'heading-6':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":6}';
+                                    break;
+                                case 'list':
+                                    blockName = 'list';
+                                    attrs = ' {"ordered":false}';
+                                    break;
+                                case 'ordered-list':
+                                    blockName = 'list';
+                                    attrs = ' {"ordered":true}';
+                                    break;
+                                case 'quote':
+                                    blockName = 'quote';
+                                    break;
+                                case 'pullquote':
+                                    blockName = 'pullquote';
+                                    break;
+                                case 'code':
+                                    blockName = 'code';
+                                    break;
+                                case 'image':
+                                    blockName = 'image';
+                                    if (block.attributes.id) {
+                                        attrs = ` {"id":${block.attributes.id}}`;
+                                    }
+                                    break;
+                                default:
+                                    blockName = 'paragraph';
+                            }
+                            
+                            // Get the proper HTML tag for the block
+                            const tagName = this.getBlockTagName(block.type);
+                            let content = '';
+                            
+                            // Format content based on block type
+                            if (block.type === 'image' && block.attributes.url) {
+                                content = `<figure class="wp-block-image"><img src="${block.attributes.url}" alt="${block.attributes.alt || ''}" /></figure>`;
+                            } else if (tagName) {
+                                content = `<${tagName}>${block.content}</${tagName}>`;
+                            } else {
+                                content = block.content;
+                            }
+                            
+                            // Wrap with WordPress block comments
+                            return `<!-- wp:${blockName}${attrs} -->\\n${content}\\n<!-- /wp:${blockName} -->`;
+                        }).join('\\n\\n');
                     }
                 }
                 
@@ -4148,28 +4303,95 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     
                     // HTML Parsing
                     parseHTMLToBlocks(html) {
-                        const div = document.createElement('div');
-                        div.innerHTML = html;
                         const blocks = [];
                         
-                        Array.from(div.children).forEach(element => {
-                            const block = this.elementToBlock(element);
-                            if (block) {
-                                blocks.push(block);
-                            }
-                        });
-                        
-                        // If no blocks found, create paragraph blocks from text content
-                        if (blocks.length === 0 && html.trim()) {
-                            const paragraphs = html.split('\\n\\n').filter(p => p.trim());
-                            paragraphs.forEach(p => {
+                        // Check if content has WordPress block comments
+                        if (html.includes('<!-- wp:')) {
+                            // Parse WordPress block format
+                            const blockRegex = /<!-- wp:([a-z-]+)(?:\\s+(\\{[^}]*\\}))? -->\\n?([\\s\\S]*?)\\n?<!-- \\/wp:\\1 -->/g;
+                            let match;
+                            
+                            while ((match = blockRegex.exec(html)) !== null) {
+                                const [fullMatch, blockName, attrsJson, content] = match;
+                                let type = 'paragraph';
+                                let attributes = {};
+                                
+                                // Parse attributes if present
+                                if (attrsJson) {
+                                    try {
+                                        attributes = JSON.parse(attrsJson);
+                                    } catch (e) {
+                                        console.error('Failed to parse block attributes:', e);
+                                    }
+                                }
+                                
+                                // Map WordPress block names to our types
+                                switch (blockName) {
+                                    case 'paragraph':
+                                        type = 'paragraph';
+                                        break;
+                                    case 'heading':
+                                        const level = attributes.level || 2;
+                                        type = `heading-${level}`;
+                                        break;
+                                    case 'list':
+                                        type = attributes.ordered ? 'ordered-list' : 'list';
+                                        break;
+                                    case 'quote':
+                                        type = 'quote';
+                                        break;
+                                    case 'pullquote':
+                                        type = 'pullquote';
+                                        break;
+                                    case 'code':
+                                        type = 'code';
+                                        break;
+                                    case 'image':
+                                        type = 'image';
+                                        // Extract image URL from content
+                                        const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/);
+                                        if (imgMatch) {
+                                            attributes.url = imgMatch[1];
+                                        }
+                                        break;
+                                }
+                                
+                                // Extract inner content from HTML tags
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = content;
+                                const innerContent = tempDiv.querySelector('p, h1, h2, h3, h4, h5, h6, pre, blockquote, ul, ol, figure');
+                                
                                 blocks.push({
                                     id: this.generateBlockId(),
-                                    type: 'paragraph',
-                                    content: p.trim(),
-                                    attributes: {}
+                                    type: type,
+                                    content: innerContent ? innerContent.innerHTML : content,
+                                    attributes: attributes
                                 });
+                            }
+                        } else {
+                            // Fallback to parsing regular HTML
+                            const div = document.createElement('div');
+                            div.innerHTML = html;
+                            
+                            Array.from(div.children).forEach(element => {
+                                const block = this.elementToBlock(element);
+                                if (block) {
+                                    blocks.push(block);
+                                }
                             });
+                            
+                            // If no blocks found, create paragraph blocks from text content
+                            if (blocks.length === 0 && html.trim()) {
+                                const paragraphs = html.split('\\n\\n').filter(p => p.trim());
+                                paragraphs.forEach(p => {
+                                    blocks.push({
+                                        id: this.generateBlockId(),
+                                        type: 'paragraph',
+                                        content: p.trim(),
+                                        attributes: {}
+                                    });
+                                });
+                            }
                         }
                         
                         return blocks;

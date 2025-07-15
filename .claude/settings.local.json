@@ -17,7 +17,9 @@
       "Bash(git commit:*)",
       "Bash(rg:*)",
       "Bash(git add:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(/Users/zacharyhamed/Library/Developer/Xcode/DerivedData/Quill-gxuenveyucmxvxaheeiaygcdodjx/Build/Products/Debug/Quill.app/Contents/MacOS/Quill)",
+      "Bash(git rm:*)"
     ]
   },
   "enableAllProjectMcpServers": false
