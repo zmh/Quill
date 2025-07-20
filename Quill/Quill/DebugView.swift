@@ -26,7 +26,7 @@ struct DebugView: View {
                 }
                 .buttonStyle(.borderless)
                 
-                Button("Export") {
+                Button("Copy") {
                     let logs = logger.exportLogs()
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(logs, forType: .string)
