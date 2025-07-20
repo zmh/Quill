@@ -459,9 +459,8 @@ struct PostEditorView: View {
                 // Update post metadata before publishing
                 updatePost()
                 
-                // Set status to published only for new posts that are drafts
-                if post.remoteID == nil && post.status == .draft {
-                    post.status = .published
+                // Only set published date when status is published
+                if post.status == .published && post.publishedDate == nil {
                     post.publishedDate = Date()
                 }
                 
