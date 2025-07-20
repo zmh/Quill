@@ -398,8 +398,8 @@ struct PostEditorView: View {
         .onChange(of: post.id) { _, newPostID in
             if currentPostID != newPostID {
                 currentPostID = newPostID
-                // Force WebView to update when switching posts
-                webViewKey = UUID()
+                // Don't recreate WebView - let it handle content updates internally
+                // The WebView's onChange will detect the new post and update accordingly
             }
         }
         .onChange(of: editorTypeface) { _, _ in 

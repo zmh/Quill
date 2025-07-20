@@ -54,6 +54,18 @@ struct GutenbergWebView: View {
         .onAppear {
             isLoading = true
         }
+        .onDisappear {
+            // Save any pending changes when view disappears
+            #if os(macOS)
+            if let webView = webViewRef as? GutenbergWKWebView,
+               let coordinator = webView.coordinator {
+                coordinator.savePendingChanges()
+            }
+            #elseif os(iOS)
+            // iOS doesn't have direct access to coordinator through webView
+            // The coordinator will handle cleanup in its deinit
+            #endif
+        }
         .onChange(of: post.id) { _, newPostID in
             // When post selection changes, trigger a refresh to decode HTML entities
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -2212,9 +2224,33 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
+        private var lastPendingContent: String?
         
         init(_ parent: GutenbergWebViewRepresentable) {
             self.parent = parent
+        }
+        
+        deinit {
+            // Save any pending changes before deallocation
+            savePendingChanges()
+        }
+        
+        func savePendingChanges() {
+            // Cancel timer and save immediately
+            contentUpdateTimer?.invalidate()
+            contentUpdateTimer = nil
+            
+            // If we have pending content, save it immediately
+            if let pendingContent = lastPendingContent {
+                DispatchQueue.main.async {
+                    self.parent.post.content = pendingContent
+                    self.parent.post.modifiedDate = Date()
+                    self.lastPendingContent = nil
+                    
+                    // SwiftData automatically saves changes
+                    DebugLogger.shared.log("Saved pending changes on cleanup", level: .debug, source: "WebView")
+                }
+            }
         }
         
         // MARK: - WKNavigationDelegate
@@ -2260,12 +2296,16 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             guard let data = body as? [String: Any],
                   let html = data["html"] as? String else { return }
             
+            // Store the pending content
+            lastPendingContent = html
+            
             // Debounce content updates
             contentUpdateTimer?.invalidate()
             contentUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
                 DispatchQueue.main.async {
                     self.parent.post.content = html
                     self.parent.post.modifiedDate = Date()
+                    self.lastPendingContent = nil
                 }
             }
         }
@@ -2566,15 +2606,31 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         // MARK: - Content Management
         
         func updateContent(_ content: String) {
+            // Save any pending changes first
+            self.savePendingChanges()
+            
             // Update editor content through JavaScript
+            guard let webView = parent.webViewRef else { return }
+            
+            let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(content)
+            let escapedContent = decodedContent
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "`", with: "\\`")
+                .replacingOccurrences(of: "$", with: "\\$")
+            
             let script = """
                 if (window.gutenbergEditor) {
-                    window.gutenbergEditor.setContent(`\(HTMLHandler.shared.decodeHTMLEntitiesManually(content).replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`"))`);
+                    window.gutenbergEditor.setContent(`\(escapedContent)`);
                 }
             """
             
-            // Execute script (would need web view reference)
-            // This is a simplified approach - full implementation would need proper web view access
+            webView.evaluateJavaScript(script) { _, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to update content: \(error)", level: .error, source: "WebView")
+                } else {
+                    DebugLogger.shared.log("Successfully updated content for new post", level: .debug, source: "WebView")
+                }
+            }
         }
         
         // MARK: - WKUIDelegate
@@ -4526,9 +4582,33 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
+        private var lastPendingContent: String?
         
         init(_ parent: GutenbergWebViewRepresentable) {
             self.parent = parent
+        }
+        
+        deinit {
+            // Save any pending changes before deallocation
+            savePendingChanges()
+        }
+        
+        func savePendingChanges() {
+            // Cancel timer and save immediately
+            contentUpdateTimer?.invalidate()
+            contentUpdateTimer = nil
+            
+            // If we have pending content, save it immediately
+            if let pendingContent = lastPendingContent {
+                DispatchQueue.main.async {
+                    self.parent.post.content = pendingContent
+                    self.parent.post.modifiedDate = Date()
+                    self.lastPendingContent = nil
+                    
+                    // SwiftData automatically saves changes
+                    DebugLogger.shared.log("Saved pending changes on cleanup", level: .debug, source: "WebView")
+                }
+            }
         }
         
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -4570,11 +4650,16 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             guard let data = body as? [String: Any],
                   let html = data["html"] as? String else { return }
             
+            // Store the pending content
+            lastPendingContent = html
+            
+            // Debounce content updates
             contentUpdateTimer?.invalidate()
             contentUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
                 DispatchQueue.main.async {
                     self.parent.post.content = html
                     self.parent.post.modifiedDate = Date()
+                    self.lastPendingContent = nil
                 }
             }
         }
@@ -4838,8 +4923,31 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         }
         
         func updateContent(_ content: String) {
+            // Save any pending changes first
+            self.savePendingChanges()
+            
             // Update editor content through JavaScript
-            // This would be implemented with proper WebView reference
+            guard let webView = parent.webViewRef else { return }
+            
+            let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(content)
+            let escapedContent = decodedContent
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "`", with: "\\`")
+                .replacingOccurrences(of: "$", with: "\\$")
+            
+            let script = """
+                if (window.gutenbergEditor) {
+                    window.gutenbergEditor.setContent(`\(escapedContent)`);
+                }
+            """
+            
+            webView.evaluateJavaScript(script) { _, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to update content: \(error)", level: .error, source: "WebView")
+                } else {
+                    DebugLogger.shared.log("Successfully updated content for new post", level: .debug, source: "WebView")
+                }
+            }
         }
         
         // MARK: - WKUIDelegate Methods for JavaScript Dialogs
