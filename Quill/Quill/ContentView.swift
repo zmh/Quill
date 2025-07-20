@@ -332,12 +332,12 @@ struct PostEditorView: View {
             TextField("Title", text: $post.titlePlainText)
                 .font(.title)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
             
             Divider()
-                .padding(.horizontal, 40)
+                .padding(.horizontal, 20)
             
             // Gutenberg WebView editor
             GutenbergWebView(
@@ -359,11 +359,11 @@ struct PostEditorView: View {
             }
             
             ToolbarItemGroup(placement: .primaryAction) {
-                if siteConfigs.first != nil, post.status == .published {
+                if siteConfigs.first != nil, post.remoteID != nil {
                     Button(action: { openPostOnSite() }) {
                         Image(systemName: "arrow.up.right.square")
                     }
-                    .help("View on Site")
+                    .help(post.status == .published ? "View on Site" : "Edit in WordPress")
                 }
                 
                 Button(action: { showMetadata.toggle() }) {
@@ -550,9 +550,15 @@ struct PostEditorView: View {
             siteURL += "/"
         }
         
-        // Use slug if available, otherwise use post ID
-        let postIdentifier = post.slug.isEmpty ? String(post.remoteID ?? 0) : post.slug
-        let postURL = siteURL + postIdentifier
+        // For drafts, use WordPress admin edit URL
+        let postURL: String
+        if post.status == .draft, let remoteID = post.remoteID {
+            postURL = siteURL + "wp-admin/post.php?post=\(remoteID)&action=edit"
+        } else {
+            // For published posts, use slug if available, otherwise use post ID
+            let postIdentifier = post.slug.isEmpty ? String(post.remoteID ?? 0) : post.slug
+            postURL = siteURL + postIdentifier
+        }
         
         // Open in default browser
         if let url = URL(string: postURL) {
