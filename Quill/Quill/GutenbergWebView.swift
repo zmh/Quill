@@ -121,6 +121,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         configuration.userContentController.add(coordinator, name: "editorError")
         configuration.userContentController.add(coordinator, name: "imageUpload")
         configuration.userContentController.add(coordinator, name: "requestImagePicker")
+        configuration.userContentController.add(coordinator, name: "consoleLog")
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
@@ -934,11 +935,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                     
                     handleContentChange() {
-                        // Generate HTML from blocks
-                        const html = this.blocks.map(block => {
-                            const tagName = this.getBlockTagName(block.type);
-                            return `<${tagName}>${block.content}</${tagName}>`;
-                        }).join('\\n');
+                        // Serialize blocks to WordPress format with block comments
+                        const wpContent = this.serializeBlocksToWordPress();
                         
                         const text = this.blocks.map(block => {
                             const tempDiv = document.createElement('div');
@@ -946,12 +944,81 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             return tempDiv.textContent || tempDiv.innerText || '';
                         }).join('\\n\\n');
                         
-                        // Update content
-                        this.content = html;
+                        // Update content with WordPress formatted blocks
+                        this.content = wpContent;
                         
-                        // Notify native app
-                        this.notifyContentUpdate(html);
+                        // Notify native app with WordPress formatted content
+                        this.notifyContentUpdate(wpContent);
                         this.updateHeight();
+                    }
+                    
+                    serializeBlocksToWordPress() {
+                        return this.blocks.map(block => {
+                            let blockName = '';
+                            let attrs = '';
+                            
+                            // Map block types to WordPress block names
+                            switch (block.type) {
+                                case 'paragraph':
+                                    blockName = 'paragraph';
+                                    break;
+                                case 'heading-1':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":1}';
+                                    break;
+                                case 'heading-2':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":2}';
+                                    break;
+                                case 'heading-3':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":3}';
+                                    break;
+                                case 'heading-4':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":4}';
+                                    break;
+                                case 'heading-5':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":5}';
+                                    break;
+                                case 'heading-6':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":6}';
+                                    break;
+                                case 'list':
+                                    blockName = 'list';
+                                    break;
+                                case 'ordered-list':
+                                    blockName = 'list';
+                                    attrs = ' {"ordered":true}';
+                                    break;
+                                case 'quote':
+                                    blockName = 'quote';
+                                    break;
+                                case 'pullquote':
+                                    blockName = 'pullquote';
+                                    break;
+                                case 'code':
+                                    blockName = 'code';
+                                    break;
+                                case 'image':
+                                    blockName = 'image';
+                                    if (block.attributes && block.attributes.id) {
+                                        attrs = ` {"id":${block.attributes.id}}`;
+                                    }
+                                    break;
+                                default:
+                                    blockName = 'paragraph';
+                            }
+                            
+                            // Get appropriate HTML tag for content
+                            const tagName = this.getBlockTagName(block.type);
+                            const content = `<${tagName}>${block.content}</${tagName}>`;
+                            
+                            // Return WordPress block format with comments
+                            return `<!-- wp:${blockName}${attrs} -->\n${content}\n<!-- /wp:${blockName} -->`;
+                        }).join('\\n\\n');
                     }
                     
                     handleKeyDown(event, blockIndex) {
@@ -2106,6 +2173,13 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     // Serialize blocks to WordPress format with block comments
                     handleContentChange() {
                         const wpContent = this.serializeBlocksToWordPress();
+                        
+                        // Debug logging
+                        console.log('=== Content being sent to Swift ===');
+                        console.log('Content length:', wpContent.length);
+                        console.log('Content preview:', wpContent.substring(0, 500));
+                        console.log('Contains actual newlines:', wpContent.includes('\\n'));
+                        
                         window.webkit.messageHandlers.contentUpdate.postMessage({
                             html: wpContent,
                             text: this.content
@@ -2187,8 +2261,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             }
                             
                             // Wrap with WordPress block comments
-                            return `<!-- wp:${blockName}${attrs} -->\\n${content}\\n<!-- /wp:${blockName} -->`;
-                        }).join('\\n\\n');
+                            return `<!-- wp:${blockName}${attrs} -->\n${content}\n<!-- /wp:${blockName} -->`;
+                        }).join('\n\n');
                     }
                 }
                 
@@ -2259,6 +2333,28 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.parent.isLoading = false
             }
+            
+            // Inject JavaScript to capture console.log messages
+            let consoleLogScript = """
+                if (!window.consoleLogInjected) {
+                    window.consoleLogInjected = true;
+                    const originalLog = console.log;
+                    console.log = function(...args) {
+                        originalLog.apply(console, args);
+                        try {
+                            window.webkit.messageHandlers.consoleLog.postMessage(args.map(arg => String(arg)).join(' '));
+                        } catch (e) {
+                            originalLog('Failed to send log to native:', e);
+                        }
+                    };
+                }
+            """
+            
+            webView.evaluateJavaScript(consoleLogScript) { _, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to inject console log handler: \(error)", level: .error, source: "WebView")
+                }
+            }
         }
         
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -2286,6 +2382,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     self.handleImageUpload(message.body)
                 case "requestImagePicker":
                     self.handleImagePickerRequest(message.body)
+                case "consoleLog":
+                    if let logMessage = message.body as? String {
+                        DebugLogger.shared.log("[JS Console] \(logMessage)", level: .debug, source: "WebView")
+                    }
                 default:
                     break
                 }
@@ -2295,6 +2395,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         private func handleContentUpdate(_ body: Any) {
             guard let data = body as? [String: Any],
                   let html = data["html"] as? String else { return }
+            
+            // Log the content being saved
+            DebugLogger.shared.log("=== Content Update from Editor ===", level: .debug, source: "GutenbergWebView")
+            DebugLogger.shared.log("HTML content: \(html)", level: .debug, source: "GutenbergWebView")
+            
+            // Check for specific patterns that might cause issues
+            if html.contains("\\n") {
+                DebugLogger.shared.log("Content contains escaped newlines (\\n)", level: .warning, source: "GutenbergWebView")
+            }
+            if html.contains("&#") || html.contains("&lt;") || html.contains("&gt;") {
+                DebugLogger.shared.log("Content contains HTML entities", level: .warning, source: "GutenbergWebView")
+            }
             
             // Store the pending content
             lastPendingContent = html
@@ -2306,6 +2418,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     self.parent.post.content = html
                     self.parent.post.modifiedDate = Date()
                     self.lastPendingContent = nil
+                    
+                    DebugLogger.shared.log("Content saved to post model", level: .debug, source: "GutenbergWebView")
                 }
             }
         }
@@ -2856,6 +2970,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         configuration.userContentController.add(coordinator, name: "editorError")
         configuration.userContentController.add(coordinator, name: "imageUpload")
         configuration.userContentController.add(coordinator, name: "requestImagePicker")
+        configuration.userContentController.add(coordinator, name: "consoleLog")
         
         let webView = GutenbergWKWebView(frame: .zero, configuration: configuration)
         webView.coordinator = coordinator
@@ -3597,11 +3712,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }
                     
                     handleContentChange() {
-                        // Generate HTML from blocks
-                        const html = this.blocks.map(block => {
-                            const tagName = this.getBlockTagName(block.type);
-                            return `<${tagName}>${block.content}</${tagName}>`;
-                        }).join('\\n');
+                        // Serialize blocks to WordPress format with block comments
+                        const wpContent = this.serializeBlocksToWordPress();
                         
                         const text = this.blocks.map(block => {
                             const tempDiv = document.createElement('div');
@@ -3609,12 +3721,81 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             return tempDiv.textContent || tempDiv.innerText || '';
                         }).join('\\n\\n');
                         
-                        // Update content
-                        this.content = html;
+                        // Update content with WordPress formatted blocks
+                        this.content = wpContent;
                         
-                        // Notify native app
-                        this.notifyContentUpdate(html);
+                        // Notify native app with WordPress formatted content
+                        this.notifyContentUpdate(wpContent);
                         this.updateHeight();
+                    }
+                    
+                    serializeBlocksToWordPress() {
+                        return this.blocks.map(block => {
+                            let blockName = '';
+                            let attrs = '';
+                            
+                            // Map block types to WordPress block names
+                            switch (block.type) {
+                                case 'paragraph':
+                                    blockName = 'paragraph';
+                                    break;
+                                case 'heading-1':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":1}';
+                                    break;
+                                case 'heading-2':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":2}';
+                                    break;
+                                case 'heading-3':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":3}';
+                                    break;
+                                case 'heading-4':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":4}';
+                                    break;
+                                case 'heading-5':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":5}';
+                                    break;
+                                case 'heading-6':
+                                    blockName = 'heading';
+                                    attrs = ' {"level":6}';
+                                    break;
+                                case 'list':
+                                    blockName = 'list';
+                                    break;
+                                case 'ordered-list':
+                                    blockName = 'list';
+                                    attrs = ' {"ordered":true}';
+                                    break;
+                                case 'quote':
+                                    blockName = 'quote';
+                                    break;
+                                case 'pullquote':
+                                    blockName = 'pullquote';
+                                    break;
+                                case 'code':
+                                    blockName = 'code';
+                                    break;
+                                case 'image':
+                                    blockName = 'image';
+                                    if (block.attributes && block.attributes.id) {
+                                        attrs = ` {"id":${block.attributes.id}}`;
+                                    }
+                                    break;
+                                default:
+                                    blockName = 'paragraph';
+                            }
+                            
+                            // Get appropriate HTML tag for content
+                            const tagName = this.getBlockTagName(block.type);
+                            const content = `<${tagName}>${block.content}</${tagName}>`;
+                            
+                            // Return WordPress block format with comments
+                            return `<!-- wp:${blockName}${attrs} -->\\n${content}\\n<!-- /wp:${blockName} -->`;
+                        }).join('\\n\\n');
                     }
                     
                     // Add all the other methods - this is getting long, so I'll add the key ones
@@ -4615,6 +4796,28 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             DispatchQueue.main.async {
                 self.parent.isLoading = false
             }
+            
+            // Inject JavaScript to capture console.log messages
+            let consoleLogScript = """
+                if (!window.consoleLogInjected) {
+                    window.consoleLogInjected = true;
+                    const originalLog = console.log;
+                    console.log = function(...args) {
+                        originalLog.apply(console, args);
+                        try {
+                            window.webkit.messageHandlers.consoleLog.postMessage(args.map(arg => String(arg)).join(' '));
+                        } catch (e) {
+                            originalLog('Failed to send log to native:', e);
+                        }
+                    };
+                }
+            """
+            
+            webView.evaluateJavaScript(consoleLogScript) { _, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to inject console log handler: \(error)", level: .error, source: "WebView")
+                }
+            }
         }
         
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -4640,6 +4843,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     self.handleImageUpload(message.body)
                 case "requestImagePicker":
                     self.handleImagePickerRequest(message.body)
+                case "consoleLog":
+                    if let logMessage = message.body as? String {
+                        DebugLogger.shared.log("[JS Console] \(logMessage)", level: .debug, source: "WebView")
+                    }
                 default:
                     break
                 }
@@ -4649,6 +4856,18 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         private func handleContentUpdate(_ body: Any) {
             guard let data = body as? [String: Any],
                   let html = data["html"] as? String else { return }
+            
+            // Log the content being saved
+            DebugLogger.shared.log("=== Content Update from Editor ===", level: .debug, source: "GutenbergWebView")
+            DebugLogger.shared.log("HTML content: \(html)", level: .debug, source: "GutenbergWebView")
+            
+            // Check for specific patterns that might cause issues
+            if html.contains("\\n") {
+                DebugLogger.shared.log("Content contains escaped newlines (\\n)", level: .warning, source: "GutenbergWebView")
+            }
+            if html.contains("&#") || html.contains("&lt;") || html.contains("&gt;") {
+                DebugLogger.shared.log("Content contains HTML entities", level: .warning, source: "GutenbergWebView")
+            }
             
             // Store the pending content
             lastPendingContent = html
@@ -4660,6 +4879,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     self.parent.post.content = html
                     self.parent.post.modifiedDate = Date()
                     self.lastPendingContent = nil
+                    
+                    DebugLogger.shared.log("Content saved to post model", level: .debug, source: "GutenbergWebView")
                 }
             }
         }

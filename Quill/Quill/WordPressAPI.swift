@@ -164,9 +164,29 @@ class WordPressAPI {
             date: post.status == .scheduled ? post.publishedDate?.toWordPressDateString() : nil
         )
         
+        // Log the content being sent to WordPress
+        DebugLogger.shared.log("=== Sending content to WordPress ===", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Post ID: \(post.remoteID ?? 0)", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Title: \(post.title)", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Content length: \(post.content.count) characters", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Content preview: \(String(post.content.prefix(500)))", level: .debug, source: "WordPressAPI")
+        
+        // Check for potential issues
+        if post.content.contains("\\n") {
+            DebugLogger.shared.log("WARNING: Content contains escaped newlines (\\n)", level: .warning, source: "WordPressAPI")
+        }
+        if post.content.contains("&#") || post.content.contains("&lt;") || post.content.contains("&gt;") {
+            DebugLogger.shared.log("WARNING: Content contains HTML entities", level: .warning, source: "WordPressAPI")
+        }
+        
         do {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(postData)
+            
+            // Log the JSON being sent
+            if let jsonString = String(data: request.httpBody!, encoding: .utf8) {
+                DebugLogger.shared.log("JSON being sent: \(String(jsonString.prefix(1000)))", level: .debug, source: "WordPressAPI")
+            }
         } catch {
             throw WordPressError.encodingError
         }
@@ -232,9 +252,29 @@ class WordPressAPI {
             date: post.status == .scheduled ? post.publishedDate?.toWordPressDateString() : nil
         )
         
+        // Log the content being sent to WordPress
+        DebugLogger.shared.log("=== Sending content to WordPress ===", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Post ID: \(post.remoteID ?? 0)", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Title: \(post.title)", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Content length: \(post.content.count) characters", level: .info, source: "WordPressAPI")
+        DebugLogger.shared.log("Content preview: \(String(post.content.prefix(500)))", level: .debug, source: "WordPressAPI")
+        
+        // Check for potential issues
+        if post.content.contains("\\n") {
+            DebugLogger.shared.log("WARNING: Content contains escaped newlines (\\n)", level: .warning, source: "WordPressAPI")
+        }
+        if post.content.contains("&#") || post.content.contains("&lt;") || post.content.contains("&gt;") {
+            DebugLogger.shared.log("WARNING: Content contains HTML entities", level: .warning, source: "WordPressAPI")
+        }
+        
         do {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(postData)
+            
+            // Log the JSON being sent
+            if let jsonString = String(data: request.httpBody!, encoding: .utf8) {
+                DebugLogger.shared.log("JSON being sent: \(String(jsonString.prefix(1000)))", level: .debug, source: "WordPressAPI")
+            }
         } catch {
             throw WordPressError.encodingError
         }
@@ -249,12 +289,20 @@ class WordPressAPI {
             do {
                 let decoder = JSONDecoder()
                 let updatedPost = try decoder.decode(WordPressPost.self, from: data)
+                
+                // Log the response content
+                DebugLogger.shared.log("=== WordPress Update Response ===", level: .info, source: "WordPressAPI")
+                DebugLogger.shared.log("Updated post ID: \(updatedPost.id)", level: .info, source: "WordPressAPI")
+                DebugLogger.shared.log("Response content preview: \(String(updatedPost.content.rendered.prefix(500)))", level: .debug, source: "WordPressAPI")
+                
                 return updatedPost
             } catch {
                 if let responseString = String(data: data, encoding: .utf8) {
                     print("Raw update post response: \(responseString)")
+                    DebugLogger.shared.log("Raw update response: \(responseString)", level: .error, source: "WordPressAPI")
                 }
                 print("Post update decoding error: \(error)")
+                DebugLogger.shared.log("Post update decoding error: \(error)", level: .error, source: "WordPressAPI")
                 throw WordPressError.decodingError
             }
         } else if httpResponse.statusCode == 401 {
