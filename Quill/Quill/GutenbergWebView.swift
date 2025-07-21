@@ -1038,6 +1038,34 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             return;
                         }
                         
+                        // Handle text formatting shortcuts (Cmd+B, Cmd+I, Cmd+U)
+                        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
+                            let handled = false;
+                            switch (event.key.toLowerCase()) {
+                                case 'b':
+                                    event.preventDefault();
+                                    document.execCommand('bold', false, null);
+                                    handled = true;
+                                    break;
+                                case 'i':
+                                    event.preventDefault();
+                                    document.execCommand('italic', false, null);
+                                    handled = true;
+                                    break;
+                                case 'u':
+                                    event.preventDefault();
+                                    document.execCommand('underline', false, null);
+                                    handled = true;
+                                    break;
+                            }
+                            
+                            if (handled) {
+                                // Trigger content update after formatting
+                                this.handleContentChange();
+                                return;
+                            }
+                        }
+                        
                         if (this.showingSlashCommands) {
                             this.handleSlashCommandKeydown(event);
                             return;
@@ -4071,7 +4099,44 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }
                     
                     handleKeyDown(event, blockIndex) {
-                        window.webkit.messageHandlers.editorError.postMessage(`KeyDown event: ${event.key}, showingSlashCommands: ${this.showingSlashCommands}`);
+                        window.webkit.messageHandlers.editorError.postMessage(`KeyDown event: key="${event.key}", metaKey=${event.metaKey}, ctrlKey=${event.ctrlKey}, showingSlashCommands: ${this.showingSlashCommands}`);
+                        
+                        // Handle Cmd+K for links before other key handling
+                        if (event.key === 'k' && (event.metaKey || event.ctrlKey) && !event.shiftKey) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            window.webkit.messageHandlers.editorError.postMessage(`Cmd+K detected, showing link popover for block ${blockIndex}`);
+                            this.showLinkPopover(blockIndex);
+                            return;
+                        }
+                        
+                        // Handle text formatting shortcuts (Cmd+B, Cmd+I, Cmd+U)
+                        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
+                            let handled = false;
+                            switch (event.key.toLowerCase()) {
+                                case 'b':
+                                    event.preventDefault();
+                                    document.execCommand('bold', false, null);
+                                    handled = true;
+                                    break;
+                                case 'i':
+                                    event.preventDefault();
+                                    document.execCommand('italic', false, null);
+                                    handled = true;
+                                    break;
+                                case 'u':
+                                    event.preventDefault();
+                                    document.execCommand('underline', false, null);
+                                    handled = true;
+                                    break;
+                            }
+                            
+                            if (handled) {
+                                // Trigger content update after formatting
+                                this.handleContentChange();
+                                return;
+                            }
+                        }
                         
                         if (this.showingSlashCommands) {
                             this.handleSlashCommandKeydown(event);
