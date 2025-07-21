@@ -319,6 +319,7 @@ struct PostEditorView: View {
     @AppStorage("editorFontSize") private var editorFontSize = 16
     @State private var webViewKey = UUID() // Force WebView refresh when settings change
     @Query private var siteConfigs: [SiteConfiguration]
+    @State private var lastLoadedPostID: UUID?
     
     // Publish workflow state
     @State private var isPublishing = false
@@ -390,16 +391,29 @@ struct PostEditorView: View {
                 }
             }
         }
-        .onChange(of: post.title) { _, _ in updatePost() }
-        .onChange(of: post.content) { _, _ in updatePost() }
+        .onChange(of: post.title) { oldTitle, newTitle in 
+            // Only update if we're editing the same post
+            if currentPostID == post.id && oldTitle != newTitle {
+                updatePost()
+            }
+        }
+        .onChange(of: post.content) { oldContent, newContent in 
+            // Only update if we're editing the same post
+            if currentPostID == post.id && oldContent != newContent {
+                updatePost()
+            }
+        }
         .onChange(of: post.syncStatus) { oldStatus, newStatus in
             DebugLogger.shared.log("Sync status changed from \(oldStatus) to \(newStatus), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
         }
         .onChange(of: post.id) { _, newPostID in
             if currentPostID != newPostID {
                 currentPostID = newPostID
-                // Don't recreate WebView - let it handle content updates internally
-                // The WebView's onChange will detect the new post and update accordingly
+                // Force WebView recreation to ensure clean state
+                if lastLoadedPostID != newPostID {
+                    lastLoadedPostID = newPostID
+                    webViewKey = UUID()
+                }
             }
         }
         .onChange(of: editorTypeface) { _, _ in 
@@ -509,6 +523,8 @@ struct PostEditorView: View {
                 // Mark as synced and update baseline hash
                 post.markAsSynced()
                 
+                // SwiftData will handle saving when autosave is disabled
+                
                 DebugLogger.shared.log("Post successfully published: \(wordPressPost.id)", level: .info, source: "ContentView")
                 
             } catch {
@@ -528,6 +544,7 @@ struct PostEditorView: View {
     }
     
     private func updatePost() {
+        // Update immediately without deferring
         post.modifiedDate = Date()
         let plainTextContent = HTMLHandler.shared.htmlToPlainText(post.content)
         post.wordCount = plainTextContent.split(separator: " ").count

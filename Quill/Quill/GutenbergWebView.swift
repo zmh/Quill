@@ -508,6 +508,11 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     min-height: 200px;
                 }
                 
+                /* Remove focus outlines */
+                .wp-block.is-focused {
+                    outline: none;
+                }
+                
                 /* Native macOS-style slash command menu */
                 .slash-command-menu {
                     position: fixed;
@@ -1133,6 +1138,32 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         const contentElement = this.createContentElement(block);
                         blockElement.appendChild(contentElement);
                         
+                        // Add click handler for image blocks
+                        if (block.type === 'image') {
+                            blockElement.style.cursor = 'pointer';
+                            blockElement.tabIndex = 0; // Make it focusable
+                            blockElement.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Set this as the current block index
+                                this.currentBlockIndex = index;
+                                this.setCurrentBlock(block.id);
+                                
+                                // Focus the block element itself
+                                blockElement.focus();
+                                
+                                window.webkit.messageHandlers.editorError.postMessage(`Image block clicked: ${block.id}, index: ${index}`);
+                            });
+                            
+                            // Handle keyboard events on the image block
+                            blockElement.addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    this.handleEnterKey(index);
+                                }
+                            });
+                        }
                         
                         return blockElement;
                     }
@@ -1314,6 +1345,22 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     
                     handleEnterKey(blockIndex) {
                         const block = this.blocks[blockIndex];
+                        
+                        // Special handling for image blocks - always create new paragraph below
+                        if (block.type === 'image') {
+                            const newBlock = {
+                                id: this.generateBlockId(),
+                                type: 'paragraph',
+                                content: '',
+                                attributes: {}
+                            };
+                            
+                            this.blocks.splice(blockIndex + 1, 0, newBlock);
+                            this.render();
+                            this.focusBlock(blockIndex + 1);
+                            this.handleContentChange();
+                            return;
+                        }
                         
                         // Special handling for list blocks
                         if (block.type === 'list' || block.type === 'ordered-list') {
@@ -3228,6 +3275,11 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     min-height: 200px;
                 }
                 
+                /* Remove focus outlines */
+                .wp-block.is-focused {
+                    outline: none;
+                }
+                
                 /* Native macOS-style slash command menu */
                 .slash-command-menu {
                     position: fixed;
@@ -3813,6 +3865,32 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         const contentElement = this.createContentElement(block);
                         blockElement.appendChild(contentElement);
                         
+                        // Add click handler for image blocks
+                        if (block.type === 'image') {
+                            blockElement.style.cursor = 'pointer';
+                            blockElement.tabIndex = 0; // Make it focusable
+                            blockElement.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // Set this as the current block index
+                                this.currentBlockIndex = index;
+                                this.setCurrentBlock(block.id);
+                                
+                                // Focus the block element itself
+                                blockElement.focus();
+                                
+                                window.webkit.messageHandlers.editorError.postMessage(`Image block clicked: ${block.id}, index: ${index}`);
+                            });
+                            
+                            // Handle keyboard events on the image block
+                            blockElement.addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    this.handleEnterKey(index);
+                                }
+                            });
+                        }
                         
                         return blockElement;
                     }
@@ -4083,6 +4161,22 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     // Continue with essential methods
                     handleEnterKey(blockIndex) {
                         const block = this.blocks[blockIndex];
+                        
+                        // Special handling for image blocks - always create new paragraph below
+                        if (block.type === 'image') {
+                            const newBlock = {
+                                id: this.generateBlockId(),
+                                type: 'paragraph',
+                                content: '',
+                                attributes: {}
+                            };
+                            
+                            this.blocks.splice(blockIndex + 1, 0, newBlock);
+                            this.render();
+                            this.focusBlock(blockIndex + 1);
+                            this.handleContentChange();
+                            return;
+                        }
                         
                         // Special handling for list blocks
                         if (block.type === 'list' || block.type === 'ordered-list') {

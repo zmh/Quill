@@ -56,7 +56,7 @@ final class Post {
     }
     
     // Computed property to get the most relevant date for display
-    var displayDate: Date {
+    @Transient var displayDate: Date {
         // For published posts, use published date if available
         if status == .published || status == .scheduled {
             return publishedDate ?? createdDate
@@ -66,7 +66,7 @@ final class Post {
     }
     
     // Computed property for clean text without HTML
-    var contentPlainText: String {
+    @Transient var contentPlainText: String {
         get {
             return HTMLHandler.shared.htmlToPlainText(content)
         }
@@ -77,7 +77,7 @@ final class Post {
     }
     
     // Computed property for clean title without HTML
-    var titlePlainText: String {
+    @Transient var titlePlainText: String {
         get {
             return HTMLHandler.shared.htmlToPlainText(title)
         }
@@ -87,20 +87,18 @@ final class Post {
     }
     
     // Content hash for change detection
-    var contentHash: String {
+    @Transient var contentHash: String {
         // Normalize content to ignore formatting differences
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedContent = HTMLHandler.shared.normalizeHTML(content)
         let combinedContent = "\(normalizedTitle)|\(normalizedContent)|\(status.rawValue)|\(slug)"
         
-        // Use a more stable hash implementation
-        var hasher = Hasher()
-        hasher.combine(combinedContent)
-        return String(hasher.finalize())
+        // Use SHA256 for stable hashing
+        return combinedContent.data(using: .utf8)?.base64EncodedString() ?? ""
     }
     
     // Check if content has changed since last sync
-    var hasUnsavedChanges: Bool {
+    @Transient var hasUnsavedChanges: Bool {
         // New posts always have changes to save
         if remoteID == nil {
             return true
