@@ -380,6 +380,7 @@ struct PostEditorView: View {
                 }
                 .buttonStyle(QuillButtonStyle())
                 .disabled(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges)
+                .keyboardShortcut("s", modifiers: .command)
                 .onAppear {
                     DebugLogger.shared.log("Button state - disabled: \(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
                 }
