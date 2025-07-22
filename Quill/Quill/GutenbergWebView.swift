@@ -582,6 +582,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         console.log('GutenbergEditor: Constructor called');
                         this.content = `\(HTMLHandler.shared.decodeHTMLEntitiesManually(post.content).replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`"))`;
                         this.blocks = [];
+                        this.shouldAutoFocus = false; // Don't auto-focus on initial load
+                        this.hasUserInteracted = false;
                         console.log('GutenbergEditor: About to call init()');
                         this.init();
                     }
@@ -681,12 +683,29 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         
                         // Handle clicks to update current block
                         this.blocksContainer.addEventListener('click', (e) => {
+                            // Mark that user has interacted with the editor
+                            if (!this.hasUserInteracted) {
+                                this.hasUserInteracted = true;
+                                this.shouldAutoFocus = true;
+                            }
+                            
                             const blockElement = this.findBlockElementFromEvent(e);
                             if (blockElement) {
                                 const blockId = blockElement.getAttribute('data-block-id');
                                 this.setCurrentBlock(blockId);
+                                
+                                // Don't call focusBlock here - let the browser handle natural cursor placement
+                                // focusBlock always moves cursor to end, which interferes with clicking at specific positions
                             }
                         });
+                        
+                        // Handle focus events to detect user interaction
+                        this.blocksContainer.addEventListener('focus', (e) => {
+                            if (!this.hasUserInteracted) {
+                                this.hasUserInteracted = true;
+                                this.shouldAutoFocus = true;
+                            }
+                        }, true);
                     }
                     
                     findBlockElementFromEvent(event) {
@@ -926,16 +945,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             this.blocksContainer.appendChild(blockElement);
                         });
                         
-                        // Restore focus to the previously focused block
-                        if (previousCurrentBlock) {
-                            const blockIndex = this.blocks.findIndex(b => b.id === previousCurrentBlock);
-                            if (blockIndex >= 0) {
-                                this.focusBlock(blockIndex);
-                            } else if (this.blocks.length > 0) {
+                        // Only restore focus if user has interacted with the editor
+                        if (this.hasUserInteracted) {
+                            if (previousCurrentBlock) {
+                                const blockIndex = this.blocks.findIndex(b => b.id === previousCurrentBlock);
+                                if (blockIndex >= 0) {
+                                    this.focusBlock(blockIndex);
+                                } else if (this.blocks.length > 0 && this.shouldAutoFocus) {
+                                    this.focusBlock(0);
+                                }
+                            } else if (this.blocks.length > 0 && this.shouldAutoFocus) {
                                 this.focusBlock(0);
                             }
-                        } else if (this.blocks.length > 0) {
-                            this.focusBlock(0);
                         }
                     }
                     
@@ -2027,6 +2048,9 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     setContent(content) {
                         this.content = content;
                         this.parseContent();
+                        // Reset user interaction flag when new content is set
+                        this.hasUserInteracted = false;
+                        this.shouldAutoFocus = false;
                         this.render();
                     }
                     
@@ -3434,6 +3458,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         console.log('GutenbergEditor: Constructor called');
                         this.content = `\(HTMLHandler.shared.decodeHTMLEntitiesManually(post.content).replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`"))`;
                         this.blocks = [];
+                        this.shouldAutoFocus = false; // Don't auto-focus on initial load
+                        this.hasUserInteracted = false;
                         console.log('GutenbergEditor: About to call init()');
                         this.init();
                     }
@@ -3533,12 +3559,29 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         
                         // Handle clicks to update current block
                         this.blocksContainer.addEventListener('click', (e) => {
+                            // Mark that user has interacted with the editor
+                            if (!this.hasUserInteracted) {
+                                this.hasUserInteracted = true;
+                                this.shouldAutoFocus = true;
+                            }
+                            
                             const blockElement = this.findBlockElementFromEvent(e);
                             if (blockElement) {
                                 const blockId = blockElement.getAttribute('data-block-id');
                                 this.setCurrentBlock(blockId);
+                                
+                                // Don't call focusBlock here - let the browser handle natural cursor placement
+                                // focusBlock always moves cursor to end, which interferes with clicking at specific positions
                             }
                         });
+                        
+                        // Handle focus events to detect user interaction
+                        this.blocksContainer.addEventListener('focus', (e) => {
+                            if (!this.hasUserInteracted) {
+                                this.hasUserInteracted = true;
+                                this.shouldAutoFocus = true;
+                            }
+                        }, true);
                     }
                     
                     findBlockElementFromEvent(event) {
@@ -3778,16 +3821,18 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             this.blocksContainer.appendChild(blockElement);
                         });
                         
-                        // Restore focus to the previously focused block
-                        if (previousCurrentBlock) {
-                            const blockIndex = this.blocks.findIndex(b => b.id === previousCurrentBlock);
-                            if (blockIndex >= 0) {
-                                this.focusBlock(blockIndex);
-                            } else if (this.blocks.length > 0) {
+                        // Only restore focus if user has interacted with the editor
+                        if (this.hasUserInteracted) {
+                            if (previousCurrentBlock) {
+                                const blockIndex = this.blocks.findIndex(b => b.id === previousCurrentBlock);
+                                if (blockIndex >= 0) {
+                                    this.focusBlock(blockIndex);
+                                } else if (this.blocks.length > 0 && this.shouldAutoFocus) {
+                                    this.focusBlock(0);
+                                }
+                            } else if (this.blocks.length > 0 && this.shouldAutoFocus) {
                                 this.focusBlock(0);
                             }
-                        } else if (this.blocks.length > 0) {
-                            this.focusBlock(0);
                         }
                     }
                     
@@ -4880,6 +4925,9 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     setContent(content) {
                         this.content = content;
                         this.parseContent();
+                        // Reset user interaction flag when new content is set
+                        this.hasUserInteracted = false;
+                        this.shouldAutoFocus = false;
                         this.render();
                     }
                     
