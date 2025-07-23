@@ -206,9 +206,9 @@ class SyncManager: ObservableObject {
         let plainTextContent = HTMLHandler.shared.htmlToPlainText(post.content)
         post.wordCount = plainTextContent.split(separator: " ").count
         
-        // Don't mark as synced immediately - wait for WebView to finish processing
-        // The WebView will mark it as synced after it processes the content
+        // Mark as synced with the current content hash
         post.syncStatus = .synced
+        post.markAsSynced() // This sets lastSyncedHash = contentHash
     }
     
     private func createPost(from wpPost: WordPressPost) -> Post {
@@ -256,9 +256,9 @@ class SyncManager: ObservableObject {
         let plainTextContent = HTMLHandler.shared.htmlToPlainText(post.content)
         post.wordCount = plainTextContent.split(separator: " ").count
         
-        // Don't mark as synced immediately - wait for WebView to finish processing
-        // The WebView will mark it as synced after it processes the content
+        // Mark as synced with the current content hash
         post.syncStatus = .synced
+        post.markAsSynced() // This sets lastSyncedHash = contentHash
         
         return post
     }
