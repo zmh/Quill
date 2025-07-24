@@ -548,7 +548,8 @@ struct PostEditorView: View {
         // Update immediately without deferring
         post.modifiedDate = Date()
         let plainTextContent = HTMLHandler.shared.htmlToPlainText(post.content)
-        post.wordCount = plainTextContent.split(separator: " ").count
+        // Split by any whitespace (spaces, newlines, tabs, etc.) to count words correctly
+        post.wordCount = plainTextContent.split(whereSeparator: \.isWhitespace).count
         post.excerpt = String(plainTextContent.prefix(150))
         
         // Only generate slug if it's empty (don't overwrite manual changes)
