@@ -75,6 +75,24 @@ open Quill/Quill.xcodeproj
 
 3. Build and run (⌘R)
 
+### Option 3: Build and Run from Command Line
+
+1. Build the app:
+```bash
+xcodebuild -project Quill/Quill.xcodeproj -scheme Quill -configuration Debug build
+```
+
+2. Run the app:
+```bash
+open /Users/$USER/Library/Developer/Xcode/DerivedData/Quill-*/Build/Products/Debug/Quill.app
+```
+
+Or build and run in one command:
+```bash
+xcodebuild -project Quill/Quill.xcodeproj -scheme Quill -configuration Debug build && \
+open ~/Library/Developer/Xcode/DerivedData/Quill-*/Build/Products/Debug/Quill.app
+```
+
 ## 🔧 Configuration
 
 ### Setting Up Your WordPress Site
