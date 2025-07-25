@@ -77,10 +77,11 @@ struct SettingsView: View {
             Divider()
             
             // Content area
-            ScrollView {
-                Group {
-                    switch selectedTab {
-                    case "general":
+            Group {
+                switch selectedTab {
+                case "general":
+                    #if os(iOS)
+                    NavigationView {
                         GeneralSettingsView(
                             matchSystemAppearance: $matchSystemAppearance,
                             preferredAppearance: $preferredAppearance,
@@ -90,7 +91,26 @@ struct SettingsView: View {
                             editorTypeface: $editorTypeface,
                             editorFontSize: $editorFontSize
                         )
-                    case "accounts":
+                        .navigationBarHidden(true)
+                    }
+                    .navigationViewStyle(StackNavigationViewStyle())
+                    #else
+                    ScrollView {
+                        GeneralSettingsView(
+                            matchSystemAppearance: $matchSystemAppearance,
+                            preferredAppearance: $preferredAppearance,
+                            showWordCount: $showWordCount,
+                            enableAutoSave: $enableAutoSave,
+                            showAbsoluteDates: $showAbsoluteDates,
+                            editorTypeface: $editorTypeface,
+                            editorFontSize: $editorFontSize
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .background(Color(platformBackgroundColor))
+                    #endif
+                case "accounts":
+                    ScrollView {
                         AccountsSettingsView(
                             siteURL: $siteURL,
                             username: $username,
@@ -115,16 +135,20 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                    case "debug":
+                        .frame(maxWidth: .infinity)
+                    }
+                    .background(Color(platformBackgroundColor))
+                case "debug":
+                    ScrollView {
                         DebugView()
                             .modelContainer(for: [SiteConfiguration.self])
-                    default:
-                        EmptyView()
+                            .frame(maxWidth: .infinity)
                     }
+                    .background(Color(platformBackgroundColor))
+                default:
+                    EmptyView()
                 }
-                .frame(maxWidth: .infinity)
             }
-            .background(Color(platformBackgroundColor))
         }
         #if os(macOS)
         .frame(width: 500, height: 400)
@@ -291,22 +315,75 @@ struct GeneralSettingsView: View {
     @Binding var editorTypeface: String
     @Binding var editorFontSize: Int
     
+    private var typefaceDisplayName: String {
+        switch editorTypeface {
+        case "system": return "San Francisco"
+        case "sf-mono": return "SF Mono"
+        case "georgia": return "Georgia"
+        case "verdana": return "Verdana"
+        case "arial": return "Arial"
+        default: return "San Francisco"
+        }
+    }
+    
     var body: some View {
+        #if os(iOS)
+        Form {
+            Section {
+                Toggle("Match System Appearance", isOn: $matchSystemAppearance)
+                
+                if !matchSystemAppearance {
+                    HStack {
+                        Text("Theme")
+                        Spacer()
+                        Picker("Theme", selection: $preferredAppearance) {
+                            Text("Light").tag("light")
+                            Text("Dark").tag("dark")
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 120)
+                    }
+                }
+                
+                NavigationLink {
+                    TypefacePickerView(selection: $editorTypeface)
+                } label: {
+                    HStack {
+                        Text("Typeface")
+                        Spacer()
+                        Text(typefaceDisplayName)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                HStack {
+                    Text("Font Size")
+                    Spacer()
+                    Text("\(editorFontSize) pt")
+                        .foregroundColor(.secondary)
+                    Stepper("", value: $editorFontSize, in: 12...24)
+                        .labelsHidden()
+                }
+            } header: {
+                Text("APPEARANCE")
+            }
+            
+            Section {
+                Toggle("Show Word Count", isOn: $showWordCount)
+                Toggle("Enable Auto-save", isOn: $enableAutoSave)
+                Toggle("Show Absolute Dates", isOn: $showAbsoluteDates)
+            } header: {
+                Text("EDITOR")
+            }
+        }
+        #else
         VStack(alignment: .leading, spacing: 25) {
             // Appearance section
             VStack(alignment: .leading, spacing: 12) {
                 SettingsRow(label: "Appearance:") {
                     HStack(spacing: 15) {
                         Toggle("Match system appearance", isOn: $matchSystemAppearance)
-                            #if os(macOS)
-                            #if os(macOS)
-                        .toggleStyle(.checkbox)
-                        #else
-                        .toggleStyle(.switch)
-                        #endif
-                            #else
-                            .toggleStyle(.switch)
-                            #endif
+                            .toggleStyle(.checkbox)
                         Spacer()
                     }
                 }
@@ -334,15 +411,7 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "Editor:") {
                     HStack {
                         Toggle("Show word count", isOn: $showWordCount)
-                            #if os(macOS)
-                            #if os(macOS)
-                        .toggleStyle(.checkbox)
-                        #else
-                        .toggleStyle(.switch)
-                        #endif
-                            #else
-                            .toggleStyle(.switch)
-                            #endif
+                            .toggleStyle(.checkbox)
                         Spacer()
                     }
                 }
@@ -350,15 +419,7 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "") {
                     HStack {
                         Toggle("Enable auto-save", isOn: $enableAutoSave)
-                            #if os(macOS)
-                            #if os(macOS)
-                        .toggleStyle(.checkbox)
-                        #else
-                        .toggleStyle(.switch)
-                        #endif
-                            #else
-                            .toggleStyle(.switch)
-                            #endif
+                            .toggleStyle(.checkbox)
                         Spacer()
                     }
                 }
@@ -366,15 +427,7 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "") {
                     HStack {
                         Toggle("Show absolute dates", isOn: $showAbsoluteDates)
-                            #if os(macOS)
-                            #if os(macOS)
-                        .toggleStyle(.checkbox)
-                        #else
-                        .toggleStyle(.switch)
-                        #endif
-                            #else
-                            .toggleStyle(.switch)
-                            #endif
+                            .toggleStyle(.checkbox)
                         Spacer()
                     }
                 }
@@ -410,6 +463,44 @@ struct GeneralSettingsView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        #endif
+    }
+}
+
+// MARK: - Typeface Picker View
+
+struct TypefacePickerView: View {
+    @Binding var selection: String
+    @Environment(\.dismiss) private var dismiss
+    
+    let typefaces = [
+        ("system", "San Francisco"),
+        ("sf-mono", "SF Mono"),
+        ("georgia", "Georgia"),
+        ("verdana", "Verdana"),
+        ("arial", "Arial")
+    ]
+    
+    var body: some View {
+        Form {
+            ForEach(typefaces, id: \.0) { id, name in
+                HStack {
+                    Text(name)
+                    Spacer()
+                    if selection == id {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selection = id
+                    dismiss()
+                }
+            }
+        }
+        .navigationTitle("Typeface")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
