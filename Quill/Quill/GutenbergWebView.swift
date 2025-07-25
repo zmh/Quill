@@ -22,6 +22,14 @@ struct GutenbergWebView: View {
     @State private var errorMessage = ""
     @State private var webViewRef: WKWebView?
     
+    private var platformBackgroundColor: Color {
+        #if os(macOS)
+        return Color(NSColor.controlBackgroundColor)
+        #else
+        return Color(UIColor.systemBackground)
+        #endif
+    }
+    
     var body: some View {
         ZStack {
             GutenbergWebViewRepresentable(
@@ -48,7 +56,7 @@ struct GutenbergWebView: View {
                         .font(.subheadline)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color(platformBackgroundColor))
             }
         }
         .onAppear {
@@ -2783,6 +2791,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         
         // MARK: - WKUIDelegate for macOS
         
+        #if os(macOS)
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
             let alert = NSAlert()
             alert.messageText = message
@@ -2815,6 +2824,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 completionHandler(nil)
             }
         }
+        #endif
         
         // MARK: - Content Management
         
@@ -2846,8 +2856,9 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             }
         }
         
-        // MARK: - WKUIDelegate
+        // MARK: - WKUIDelegate for iOS
         
+        #if os(iOS)
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
             let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
@@ -2883,12 +2894,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 completionHandler(nil)
             }
         }
+        #endif
         
         // MARK: - Native Context Menu Support
         
         @available(iOS 13.0, *)
         func webView(_ webView: WKWebView, contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo, completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
+            // TODO: iOS doesn't have boundingRect on WKContextMenuElementInfo
+            // For now, we'll disable context menus on iOS
+            completionHandler(nil)
+            return
             
+            /*
             // Check if we're right-clicking on a block element
             webView.evaluateJavaScript("document.elementFromPoint(\(elementInfo.boundingRect.midX), \(elementInfo.boundingRect.midY))?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
                 guard let blockIndexString = result as? String,
@@ -2942,6 +2959,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }
                 }
             }
+            */
         }
         
         private func executeBlockAction(_ action: String, blockIndex: Int) {
@@ -5376,70 +5394,6 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     DebugLogger.shared.log("Successfully updated content for new post", level: .debug, source: "WebView")
                 }
             }
-        }
-        
-        // MARK: - WKUIDelegate Methods for JavaScript Dialogs
-        
-        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-            #if os(macOS)
-            let alert = NSAlert()
-            alert.messageText = "Alert"
-            alert.informativeText = message
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-            completionHandler()
-            #else
-            // iOS implementation would use UIAlertController
-            completionHandler()
-            #endif
-        }
-        
-        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
-            #if os(macOS)
-            let alert = NSAlert()
-            alert.messageText = "Add Link"
-            alert.informativeText = prompt
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.addButton(withTitle: "Cancel")
-            
-            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-            input.stringValue = defaultText ?? ""
-            input.placeholderString = "https://"
-            alert.accessoryView = input
-            
-            // Focus the text field and select all text
-            alert.window.initialFirstResponder = input
-            input.selectText(nil)
-            
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                completionHandler(input.stringValue)
-            } else {
-                completionHandler(nil)
-            }
-            #else
-            // iOS implementation would use UIAlertController
-            completionHandler(defaultText)
-            #endif
-        }
-        
-        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
-            #if os(macOS)
-            let alert = NSAlert()
-            alert.messageText = "Confirm"
-            alert.informativeText = message
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.addButton(withTitle: "Cancel")
-            
-            let response = alert.runModal()
-            completionHandler(response == .alertFirstButtonReturn)
-            #else
-            // iOS implementation would use UIAlertController
-            completionHandler(true)
-            #endif
         }
         
         // MARK: - Native Context Menu Support

@@ -7,14 +7,18 @@
 
 import SwiftUI
 import SwiftData
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var siteConfigs: [SiteConfiguration]
     
-    @State private var selectedTab = "general"
+    @State private var selectedTab = "accounts"
     @State private var siteURL = ""
     @State private var username = ""
     @State private var password = ""
@@ -32,12 +36,26 @@ struct SettingsView: View {
     @AppStorage("editorTypeface") private var editorTypeface = "system"
     @AppStorage("editorFontSize") private var editorFontSize = 16
     
+    private var platformBackgroundColor: Color {
+        #if os(macOS)
+        return Color(NSColor.controlBackgroundColor)
+        #else
+        return Color(UIColor.systemGroupedBackground)
+        #endif
+    }
+    
     var currentSite: SiteConfiguration? {
         siteConfigs.first
     }
     
     var body: some View {
         VStack(spacing: 0) {
+            #if os(iOS)
+            // Add spacing on iOS to avoid drag handle
+            Color(platformBackgroundColor)
+                .frame(height: 20)
+            #endif
+            
             // Top tab bar - matching iA Writer style
             HStack(spacing: 2) {
                 Spacer()
@@ -54,7 +72,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(Color(platformBackgroundColor))
             
             Divider()
             
@@ -106,9 +124,11 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(Color(platformBackgroundColor))
         }
+        #if os(macOS)
         .frame(width: 500, height: 400)
+        #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Done") {
@@ -278,7 +298,15 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "Appearance:") {
                     HStack(spacing: 15) {
                         Toggle("Match system appearance", isOn: $matchSystemAppearance)
-                            .toggleStyle(.checkbox)
+                            #if os(macOS)
+                            #if os(macOS)
+                        .toggleStyle(.checkbox)
+                        #else
+                        .toggleStyle(.switch)
+                        #endif
+                            #else
+                            .toggleStyle(.switch)
+                            #endif
                         Spacer()
                     }
                 }
@@ -306,7 +334,15 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "Editor:") {
                     HStack {
                         Toggle("Show word count", isOn: $showWordCount)
-                            .toggleStyle(.checkbox)
+                            #if os(macOS)
+                            #if os(macOS)
+                        .toggleStyle(.checkbox)
+                        #else
+                        .toggleStyle(.switch)
+                        #endif
+                            #else
+                            .toggleStyle(.switch)
+                            #endif
                         Spacer()
                     }
                 }
@@ -314,7 +350,15 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "") {
                     HStack {
                         Toggle("Enable auto-save", isOn: $enableAutoSave)
-                            .toggleStyle(.checkbox)
+                            #if os(macOS)
+                            #if os(macOS)
+                        .toggleStyle(.checkbox)
+                        #else
+                        .toggleStyle(.switch)
+                        #endif
+                            #else
+                            .toggleStyle(.switch)
+                            #endif
                         Spacer()
                     }
                 }
@@ -322,7 +366,15 @@ struct GeneralSettingsView: View {
                 SettingsRow(label: "") {
                     HStack {
                         Toggle("Show absolute dates", isOn: $showAbsoluteDates)
-                            .toggleStyle(.checkbox)
+                            #if os(macOS)
+                            #if os(macOS)
+                        .toggleStyle(.checkbox)
+                        #else
+                        .toggleStyle(.switch)
+                        #endif
+                            #else
+                            .toggleStyle(.switch)
+                            #endif
                         Spacer()
                     }
                 }
@@ -379,10 +431,14 @@ struct AccountsSettingsView: View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsRow(label: "Site URL:") {
                 HStack {
-                    TextField("https://example.com", text: $siteURL)
+                    TextField("", text: $siteURL, prompt: Text("https://example.com").foregroundColor(.secondary))
                         .textFieldStyle(.roundedBorder)
                         .disabled(isTestingConnection)
                         .frame(maxWidth: 300)
+                        .textContentType(.URL)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .foregroundColor(.primary)
                     Spacer()
                 }
             }
@@ -390,7 +446,11 @@ struct AccountsSettingsView: View {
             SettingsRow(label: "") {
                 HStack {
                     Toggle("WordPress.com site", isOn: $isWordPressCom)
+                        #if os(macOS)
                         .toggleStyle(.checkbox)
+                        #else
+                        .toggleStyle(.switch)
+                        #endif
                         .disabled(isTestingConnection)
                     Spacer()
                 }
@@ -558,9 +618,13 @@ struct DebugLogView: View {
                 .foregroundColor(.red)
                 
                 Button("Copy All") {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(logger.exportLogs(), forType: .string)
+                    let logs = logger.exportLogs()
+                    #if os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(logs, forType: .string)
+                    #else
+                    UIPasteboard.general.string = logs
+                    #endif
                 }
             }
             

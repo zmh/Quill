@@ -80,6 +80,10 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .modelContainer(for: [SiteConfiguration.self, Post.self])
+                #if os(iOS)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                #endif
         }
         .preferredColorScheme(getColorScheme())
         .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
