@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 #if os(macOS)
 import AppKit
-#else
+#elseif os(iOS)
 import UIKit
 #endif
 
@@ -44,7 +44,7 @@ struct DebugView: View {
                     #if os(macOS)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(logs, forType: .string)
-                    #else
+                    #elseif os(iOS)
                     UIPasteboard.general.string = logs
                     #endif
                 }
@@ -52,7 +52,7 @@ struct DebugView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(platformBackgroundColor))
+            .background(Color(.systemBackground))
             
             Divider()
             
