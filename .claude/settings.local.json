@@ -20,7 +20,15 @@
       "Bash(git restore:*)",
       "Bash(/Users/zacharyhamed/Library/Developer/Xcode/DerivedData/Quill-gxuenveyucmxvxaheeiaygcdodjx/Build/Products/Debug/Quill.app/Contents/MacOS/Quill)",
       "Bash(git rm:*)",
-      "Bash(./build/Build/Products/Debug/Quill.app/Contents/MacOS/Quill)"
+      "Bash(./build/Build/Products/Debug/Quill.app/Contents/MacOS/Quill)",
+      "Bash(xcrun simctl install:*)",
+      "Bash(xcrun simctl launch:*)",
+      "Bash(xcrun simctl boot:*)",
+      "Bash(xcrun simctl terminate:*)",
+      "Bash(xcrun simctl list:*)",
+      "Bash(xcrun simctl uninstall:*)",
+      "Bash(plutil:*)",
+      "Bash(xcrun simctl get_app_container:*)"
     ]
   },
   "enableAllProjectMcpServers": false

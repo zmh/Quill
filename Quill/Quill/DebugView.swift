@@ -17,6 +17,14 @@ struct DebugView: View {
     @ObservedObject private var logger = DebugLogger.shared
     @Query private var siteConfigs: [SiteConfiguration]
     
+    private var platformBackgroundColor: Color {
+        #if os(macOS)
+        return Color(NSColor.controlBackgroundColor)
+        #else
+        return Color(UIColor.systemGroupedBackground)
+        #endif
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Header

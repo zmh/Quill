@@ -18,7 +18,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var siteConfigs: [SiteConfiguration]
     
-    @State private var selectedTab = "general"
+    @State private var selectedTab = "accounts"
     @State private var siteURL = ""
     @State private var username = ""
     @State private var password = ""
@@ -36,12 +36,26 @@ struct SettingsView: View {
     @AppStorage("editorTypeface") private var editorTypeface = "system"
     @AppStorage("editorFontSize") private var editorFontSize = 16
     
+    private var platformBackgroundColor: Color {
+        #if os(macOS)
+        return Color(NSColor.controlBackgroundColor)
+        #else
+        return Color(UIColor.systemGroupedBackground)
+        #endif
+    }
+    
     var currentSite: SiteConfiguration? {
         siteConfigs.first
     }
     
     var body: some View {
         VStack(spacing: 0) {
+            #if os(iOS)
+            // Add spacing on iOS to avoid drag handle
+            Color(platformBackgroundColor)
+                .frame(height: 20)
+            #endif
+            
             // Top tab bar - matching iA Writer style
             HStack(spacing: 2) {
                 Spacer()
@@ -112,7 +126,9 @@ struct SettingsView: View {
             }
             .background(Color(.systemBackground))
         }
+        #if os(macOS)
         .frame(width: 500, height: 400)
+        #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Done") {
