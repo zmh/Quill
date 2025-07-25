@@ -56,7 +56,7 @@ struct GutenbergWebView: View {
                         .font(.subheadline)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(platformBackgroundColor))
+                .background(Color(.systemBackground))
             }
         }
         .onAppear {
@@ -2907,7 +2907,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             
             /*
             // Check if we're right-clicking on a block element
-            webView.evaluateJavaScript("document.elementFromPoint(\(elementInfo.boundingRect.midX), \(elementInfo.boundingRect.midY))?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
+            // Note: boundingRect not available on iOS, using fallback approach
+            webView.evaluateJavaScript("document.elementFromPoint(100, 100)?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
                 guard let blockIndexString = result as? String,
                       let blockIndex = Int(blockIndexString) else {
                     completionHandler(nil)

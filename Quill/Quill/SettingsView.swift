@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 #if os(macOS)
 import AppKit
-#else
+#elseif os(iOS)
 import UIKit
 #endif
 
@@ -72,7 +72,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(platformBackgroundColor))
+            .background(Color(.systemBackground))
             
             Divider()
             
@@ -149,6 +149,7 @@ struct SettingsView: View {
                     EmptyView()
                 }
             }
+            .background(Color(.systemBackground))
         }
         #if os(macOS)
         .frame(width: 500, height: 400)
@@ -522,14 +523,15 @@ struct AccountsSettingsView: View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsRow(label: "Site URL:") {
                 HStack {
-                    TextField("", text: $siteURL, prompt: Text("https://example.com").foregroundColor(.secondary))
+                    #if os(iOS)
+                    SiteURLTextField(text: $siteURL, isDisabled: isTestingConnection)
+                        .frame(maxWidth: 300)
+                    #else
+                    TextField("https://example.com", text: $siteURL)
                         .textFieldStyle(.roundedBorder)
                         .disabled(isTestingConnection)
                         .frame(maxWidth: 300)
-                        .textContentType(.URL)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                        .foregroundColor(.primary)
+                    #endif
                     Spacer()
                 }
             }
@@ -539,8 +541,6 @@ struct AccountsSettingsView: View {
                     Toggle("WordPress.com site", isOn: $isWordPressCom)
                         #if os(macOS)
                         .toggleStyle(.checkbox)
-                        #else
-                        .toggleStyle(.switch)
                         #endif
                         .disabled(isTestingConnection)
                     Spacer()
@@ -709,12 +709,12 @@ struct DebugLogView: View {
                 .foregroundColor(.red)
                 
                 Button("Copy All") {
-                    let logs = logger.exportLogs()
                     #if os(macOS)
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(logs, forType: .string)
-                    #else
-                    UIPasteboard.general.string = logs
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(logger.exportLogs(), forType: .string)
+                    #elseif os(iOS)
+                    UIPasteboard.general.string = logger.exportLogs()
                     #endif
                 }
             }
@@ -820,6 +820,51 @@ struct LogEntryView: View {
         }
     }
 }
+
+// MARK: - Custom TextField for iOS with proper placeholder color
+
+#if os(iOS)
+struct SiteURLTextField: UIViewRepresentable {
+    @Binding var text: String
+    let isDisabled: Bool
+    
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField()
+        textField.borderStyle = .roundedRect
+        textField.placeholder = "https://example.com"
+        
+        // Set placeholder color to system gray
+        textField.attributedPlaceholder = NSAttributedString(
+            string: "https://example.com",
+            attributes: [NSAttributedString.Key.foregroundColor: UIColor.placeholderText]
+        )
+        
+        textField.addTarget(context.coordinator, action: #selector(Coordinator.textFieldDidChange(_:)), for: .editingChanged)
+        return textField
+    }
+    
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        uiView.text = text
+        uiView.isEnabled = !isDisabled
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject {
+        let parent: SiteURLTextField
+        
+        init(_ parent: SiteURLTextField) {
+            self.parent = parent
+        }
+        
+        @objc func textFieldDidChange(_ textField: UITextField) {
+            parent.text = textField.text ?? ""
+        }
+    }
+}
+#endif
 
 #Preview {
     SettingsView()
