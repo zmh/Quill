@@ -7,6 +7,11 @@
 
 import SwiftUI
 import SwiftData
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
 
 struct DebugView: View {
     @ObservedObject private var logger = DebugLogger.shared
@@ -28,14 +33,18 @@ struct DebugView: View {
                 
                 Button("Copy") {
                     let logs = logger.exportLogs()
+                    #if os(macOS)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(logs, forType: .string)
+                    #elseif os(iOS)
+                    UIPasteboard.general.string = logs
+                    #endif
                 }
                 .buttonStyle(.borderless)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(Color(.systemBackground))
             
             Divider()
             

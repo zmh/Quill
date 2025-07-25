@@ -48,7 +48,7 @@ struct GutenbergWebView: View {
                         .font(.subheadline)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(Color(.systemBackground))
             }
         }
         .onAppear {
@@ -2783,6 +2783,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         
         // MARK: - WKUIDelegate for macOS
         
+        #if os(macOS)
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
             let alert = NSAlert()
             alert.messageText = message
@@ -2815,6 +2816,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 completionHandler(nil)
             }
         }
+        #endif
         
         // MARK: - Content Management
         
@@ -2848,6 +2850,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         
         // MARK: - WKUIDelegate
         
+        #if os(iOS)
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
             let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
@@ -2883,6 +2886,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 completionHandler(nil)
             }
         }
+        #endif
         
         // MARK: - Native Context Menu Support
         
@@ -2890,7 +2894,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         func webView(_ webView: WKWebView, contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo, completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
             
             // Check if we're right-clicking on a block element
-            webView.evaluateJavaScript("document.elementFromPoint(\(elementInfo.boundingRect.midX), \(elementInfo.boundingRect.midY))?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
+            // Note: boundingRect not available on iOS, using fallback approach
+            webView.evaluateJavaScript("document.elementFromPoint(100, 100)?.closest('.wp-block')?.getAttribute('data-block-index')") { result, error in
                 guard let blockIndexString = result as? String,
                       let blockIndex = Int(blockIndexString) else {
                     completionHandler(nil)
