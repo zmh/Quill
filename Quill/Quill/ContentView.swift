@@ -18,12 +18,80 @@ struct ContentView: View {
     @State private var filterStatus: PostStatus? = nil
     @State private var showingCompose = false
     @State private var showingSettings = false
+    @State private var selectedTab = 0
     
     @StateObject private var syncManager = SyncManager.shared
     @AppStorage("matchSystemAppearance") private var matchSystemAppearance = true
     @AppStorage("preferredAppearance") private var preferredAppearance = "light"
     
     var body: some View {
+        #if os(iOS)
+        TabView(selection: $selectedTab) {
+            // Posts Tab
+            NavigationView {
+                PostsListView(
+                    posts: posts,
+                    selectedPost: $selectedPost,
+                    searchText: $searchText,
+                    filterStatus: $filterStatus,
+                    syncManager: syncManager,
+                    modelContext: modelContext,
+                    siteConfig: siteConfigs.first
+                )
+                .alert("Sync Error", isPresented: .constant(syncManager.lastError != nil)) {
+                    Button("OK") {
+                        syncManager.lastError = nil
+                    }
+                } message: {
+                    Text(syncManager.lastError?.localizedDescription ?? "Unknown error")
+                }
+                .navigationTitle("Posts")
+                .navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem {
+                Image(systemName: "doc.text")
+                Text("Posts")
+            }
+            .tag(0)
+            
+            // Create Post Tab
+            NavigationView {
+                CreatePostTabView(
+                    selectedPost: $selectedPost,
+                    modelContext: modelContext,
+                    selectedTab: $selectedTab
+                )
+            }
+            .tabItem {
+                Image(systemName: "plus.circle.fill")
+                Text("Create")
+            }
+            .tag(1)
+            
+            // Settings Tab
+            SettingsView()
+            .tabItem {
+                Image(systemName: "gear")
+                Text("Settings")
+            }
+            .tag(2)
+        }
+        .onAppear {
+            // Show settings on first run
+            if siteConfigs.isEmpty {
+                selectedTab = 2
+            } else if let siteConfig = siteConfigs.first {
+                // Sync posts from WordPress
+                Task { @MainActor in
+                    await syncManager.syncPosts(siteConfig: siteConfig, modelContext: modelContext)
+                }
+            }
+        }
+        .preferredColorScheme(getColorScheme())
+        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+            selectedTab = 2
+        }
+        #else
         NavigationSplitView {
             // Posts List
             PostsListView(
@@ -89,6 +157,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
             showingSettings = true
         }
+        #endif
     }
     
     private func getColorScheme() -> ColorScheme? {
@@ -163,6 +232,19 @@ struct PostsListView: View {
             // Posts List
             List(selection: $selectedPost) {
                 ForEach(filteredPosts) { post in
+                    #if os(iOS)
+                    NavigationLink(destination: PostEditorView(post: post)) {
+                        PostRowView(post: post)
+                    }
+                    .contextMenu {
+                        Button(action: {
+                            deletePost(post)
+                        }) {
+                            Label("Delete Post", systemImage: "trash")
+                        }
+                        .foregroundColor(.red)
+                    }
+                    #else
                     PostRowView(post: post)
                         .tag(post)
                         .contextMenu {
@@ -173,6 +255,7 @@ struct PostsListView: View {
                             }
                             .foregroundColor(.red)
                         }
+                    #endif
                 }
                 .onDelete(perform: deletePosts)
             }
@@ -181,7 +264,9 @@ struct PostsListView: View {
             .background(.clear)
         }
         .background(.ultraThinMaterial)
+        #if !os(iOS)
         .navigationSplitViewColumnWidth(300)
+        #endif
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 if syncManager.isSyncing {
@@ -792,6 +877,82 @@ enum PublishError: LocalizedError {
         case .noPassword:
             return "WordPress password not found. Please check your site settings."
         }
+    }
+}
+
+struct CreatePostTabView: View {
+    @Binding var selectedPost: Post?
+    let modelContext: ModelContext
+    @Binding var selectedTab: Int
+    @State private var postTitle = ""
+    @State private var postContent = ""
+    @FocusState private var isTitleFocused: Bool
+    @FocusState private var isContentFocused: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            TextField("Post title", text: $postTitle)
+                .textFieldStyle(.plain)
+                .font(.title)
+                .fontWeight(.semibold)
+                .focused($isTitleFocused)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+            
+            Divider()
+                .padding(.horizontal, 16)
+            
+            TextEditor(text: $postContent)
+                .font(.body)
+                .focused($isContentFocused)
+                .padding(.horizontal, 16)
+                .scrollContentBackground(.hidden)
+                .overlay(alignment: .topLeading) {
+                    if postContent.isEmpty && !isContentFocused {
+                        Text("Start writing...")
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                            .allowsHitTesting(false)
+                    }
+                }
+            
+            Spacer()
+        }
+        .navigationBarHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: createPost) {
+                    Text("Create")
+                        .fontWeight(.semibold)
+                }
+                .disabled(postTitle.isEmpty)
+            }
+        }
+        .onAppear {
+            // Clear fields when tab is shown
+            postTitle = ""
+            postContent = ""
+        }
+    }
+    
+    private func createPost() {
+        let post = Post(
+            title: postTitle,
+            content: postContent.isEmpty ? "<p></p>" : "<p>\(postContent)</p>",
+            status: .draft
+        )
+        
+        modelContext.insert(post)
+        selectedPost = post
+        
+        // Clear the form
+        postTitle = ""
+        postContent = ""
+        
+        // Switch to posts tab to show the new post
+        selectedTab = 0
     }
 }
 

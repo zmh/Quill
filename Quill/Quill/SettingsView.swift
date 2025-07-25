@@ -126,9 +126,9 @@ struct SettingsView: View {
             }
             .background(Color(platformBackgroundColor))
         }
+        .background(Color(platformBackgroundColor))
         #if os(macOS)
         .frame(width: 500, height: 400)
-        #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Done") {
@@ -137,6 +137,7 @@ struct SettingsView: View {
                 .keyboardShortcut(.cancelAction)
             }
         }
+        #endif
         .alert("Connection Error", isPresented: $showingError) {
             Button("OK") {}
         } message: {
