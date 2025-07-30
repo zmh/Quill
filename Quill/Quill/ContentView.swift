@@ -920,9 +920,11 @@ struct CreatePostTabView: View {
             
             Spacer()
         }
+        #if os(iOS)
         .navigationBarHidden(true)
+        #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Button(action: createPost) {
                     Text("Create")
                         .fontWeight(.semibold)

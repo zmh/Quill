@@ -72,7 +72,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(.systemBackground))
+            .background(platformBackgroundColor)
             
             Divider()
             
@@ -149,7 +149,7 @@ struct SettingsView: View {
                     EmptyView()
                 }
             }
-            .background(Color(.systemBackground))
+            .background(platformBackgroundColor)
         }
         .background(Color(platformBackgroundColor))
         #if os(macOS)
@@ -502,7 +502,9 @@ struct TypefacePickerView: View {
             }
         }
         .navigationTitle("Typeface")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

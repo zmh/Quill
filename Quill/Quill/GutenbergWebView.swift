@@ -56,7 +56,7 @@ struct GutenbergWebView: View {
                         .font(.subheadline)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
+                .background(platformBackgroundColor)
             }
         }
         .onAppear {
