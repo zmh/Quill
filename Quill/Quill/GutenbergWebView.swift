@@ -2983,6 +2983,15 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
 class GutenbergWKWebView: WKWebView {
     weak var coordinator: GutenbergWebViewRepresentable.Coordinator?
     
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+    
+    override func becomeFirstResponder() -> Bool {
+        DebugLogger.shared.log("WebView becoming first responder", level: .debug, source: "WebView")
+        return super.becomeFirstResponder()
+    }
+    
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
         
@@ -3063,6 +3072,63 @@ class GutenbergWKWebView: WKWebView {
                 }
             }
         }
+    }
+    
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        DebugLogger.shared.log("performKeyEquivalent called: \(event.charactersIgnoringModifiers ?? "nil"), modifiers: \(event.modifierFlags.rawValue)", level: .debug, source: "WebView")
+        
+        // Check for Cmd+K
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "k" {
+            DebugLogger.shared.log("CMD+K detected in performKeyEquivalent", level: .info, source: "WebView")
+            
+            // Get selected text
+            self.evaluateJavaScript("window.getSelection().toString()") { [weak self] result, error in
+                if let error = error {
+                    DebugLogger.shared.log("Error getting selection: \(error)", level: .error, source: "WebView")
+                    return
+                }
+                
+                guard let selectedText = result as? String, !selectedText.isEmpty else {
+                    DebugLogger.shared.log("No text selected for hyperlink", level: .info, source: "WebView")
+                    return
+                }
+                
+                DebugLogger.shared.log("Selected text for hyperlink: \(selectedText)", level: .info, source: "WebView")
+                
+                // Show hyperlink dialog
+                DispatchQueue.main.async {
+                    self?.coordinator?.showHyperlinkDialog(for: selectedText)
+                }
+            }
+            return true
+        }
+        
+        return super.performKeyEquivalent(with: event)
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        DebugLogger.shared.log("keyDown called: \(event.charactersIgnoringModifiers ?? "nil"), modifiers: \(event.modifierFlags.rawValue)", level: .debug, source: "WebView")
+        
+        // Check for Cmd+K (backup in case performKeyEquivalent doesn't catch it)
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "k" {
+            DebugLogger.shared.log("CMD+K detected in keyDown", level: .info, source: "WebView")
+            
+            // Get selected text
+            self.evaluateJavaScript("window.getSelection().toString()") { [weak self] result, error in
+                guard let selectedText = result as? String, !selectedText.isEmpty else {
+                    // No text selected
+                    return
+                }
+                
+                // Show hyperlink dialog
+                DispatchQueue.main.async {
+                    self?.coordinator?.showHyperlinkDialog(for: selectedText)
+                }
+            }
+            return
+        }
+        
+        super.keyDown(with: event)
     }
 }
 
@@ -5427,6 +5493,94 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             webView.evaluateJavaScript(script) { result, error in
                 if let error = error {
                     DebugLogger.shared.log("Failed to execute block action \(action): \(error)", level: .error, source: "WebView")
+                }
+            }
+        }
+        
+        func showHyperlinkDialog(for selectedText: String) {
+            // Create alert for hyperlink URL input
+            let alert = NSAlert()
+            alert.messageText = "Add Link"
+            alert.informativeText = "Enter URL for \"\(selectedText)\""
+            alert.alertStyle = .informational
+            
+            // Create URL input field
+            let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+            inputField.placeholderString = "https://example.com"
+            
+            // Check clipboard for URL
+            if let clipboardString = NSPasteboard.general.string(forType: .string) {
+                // Simple URL detection - check if it starts with http:// or https://
+                if clipboardString.hasPrefix("http://") || clipboardString.hasPrefix("https://") {
+                    inputField.stringValue = clipboardString
+                }
+            }
+            
+            alert.accessoryView = inputField
+            alert.addButton(withTitle: "Add Link")
+            alert.addButton(withTitle: "Cancel")
+            
+            // Make input field first responder
+            alert.window.initialFirstResponder = inputField
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                let urlString = inputField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Validate URL
+                guard !urlString.isEmpty else { return }
+                
+                // Add https:// if no protocol specified
+                let finalURL = urlString.hasPrefix("http://") || urlString.hasPrefix("https://") 
+                    ? urlString 
+                    : "https://\(urlString)"
+                
+                // Apply hyperlink to selected text
+                applyHyperlink(url: finalURL, to: selectedText)
+            }
+        }
+        
+        private func applyHyperlink(url: String, to selectedText: String) {
+            guard let webView = parent.webViewRef else { return }
+            
+            // JavaScript to wrap selection in a link and notify content update
+            let script = """
+                (function() {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const link = document.createElement('a');
+                        link.href = '\(url.replacingOccurrences(of: "'", with: "\\'"))';
+                        link.textContent = '\(selectedText.replacingOccurrences(of: "'", with: "\\'"))';
+                        
+                        range.deleteContents();
+                        range.insertNode(link);
+                        
+                        // Clear selection
+                        selection.removeAllRanges();
+                        
+                        // Get the updated content and trigger content update
+                        if (window.gutenbergEditor) {
+                            // Get all blocks HTML
+                            const container = document.querySelector('.editor-container');
+                            if (container) {
+                                const html = container.innerHTML;
+                                
+                                // Notify native app of content update
+                                window.webkit.messageHandlers.contentUpdate.postMessage({
+                                    html: html,
+                                    text: container.innerText || ''
+                                });
+                            }
+                        }
+                    }
+                })();
+            """
+            
+            webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to apply hyperlink: \(error)", level: .error, source: "WebView")
+                } else {
+                    DebugLogger.shared.log("Successfully applied hyperlink to text: \(selectedText)", level: .info, source: "WebView")
                 }
             }
         }
