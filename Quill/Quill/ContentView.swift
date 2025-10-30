@@ -415,14 +415,19 @@ struct PostRowView: View {
 
 struct PostEditorView: View {
     @Bindable var post: Post
+    @Environment(\.modelContext) private var modelContext
     @State private var showMetadata = false
     @State private var showStatistics = false
+    @State private var showGoalProgress = false
     @State private var currentPostID: UUID?
+    @State private var sessionStartWordCount: Int = 0
     @AppStorage("showWordCount") private var showWordCount = true
     @AppStorage("editorTypeface") private var editorTypeface = "system"
     @AppStorage("editorFontSize") private var editorFontSize = 16
+    @AppStorage("writingGoalEnabled") private var writingGoalEnabled = false
     @State private var webViewKey = UUID() // Force WebView refresh when settings change
     @Query private var siteConfigs: [SiteConfiguration]
+    @Query private var sessions: [WritingSession]
     @State private var lastLoadedPostID: UUID?
 
     // Publish workflow state
@@ -485,7 +490,16 @@ struct PostEditorView: View {
                     PostMetadataView(post: post)
                         .frame(width: 360, height: 280)
                 }
-                
+
+                if writingGoalEnabled {
+                    Button(action: { showGoalProgress.toggle() }) {
+                        Image(systemName: "target")
+                    }
+                    .popover(isPresented: $showGoalProgress, arrowEdge: .bottom) {
+                        GoalProgressPopover()
+                    }
+                }
+
                 Button(action: { publishPost() }) {
                     Text(isPublishing ? "Publishing..." : getButtonText())
                 }
@@ -521,6 +535,7 @@ struct PostEditorView: View {
         .onChange(of: post.id) { _, newPostID in
             if currentPostID != newPostID {
                 currentPostID = newPostID
+                sessionStartWordCount = post.wordCount
                 // Force WebView recreation to ensure clean state
                 if lastLoadedPostID != newPostID {
                     lastLoadedPostID = newPostID
@@ -528,14 +543,15 @@ struct PostEditorView: View {
                 }
             }
         }
-        .onChange(of: editorTypeface) { _, _ in 
+        .onChange(of: editorTypeface) { _, _ in
             webViewKey = UUID() // Force WebView recreation
         }
-        .onChange(of: editorFontSize) { _, _ in 
+        .onChange(of: editorFontSize) { _, _ in
             webViewKey = UUID() // Force WebView recreation
         }
         .onAppear {
             currentPostID = post.id
+            sessionStartWordCount = post.wordCount
             // Don't initialize hash here - let WebView handle it after content is processed
         }
         .alert("Publish Error", isPresented: $showPublishError) {
@@ -660,15 +676,41 @@ struct PostEditorView: View {
         post.modifiedDate = Date()
         let plainTextContent = HTMLHandler.shared.htmlToPlainText(post.content)
         // Split by any whitespace (spaces, newlines, tabs, etc.) to count words correctly
-        post.wordCount = plainTextContent.split(whereSeparator: \.isWhitespace).count
+        let newWordCount = plainTextContent.split(whereSeparator: \.isWhitespace).count
+
+        // Track word count changes for writing goals
+        if writingGoalEnabled {
+            let wordsWrittenInSession = max(0, newWordCount - sessionStartWordCount)
+            if wordsWrittenInSession > 0 {
+                updateWritingSession(wordsWritten: wordsWrittenInSession)
+            }
+        }
+
+        post.wordCount = newWordCount
         post.excerpt = String(plainTextContent.prefix(150))
-        
+
         // Only generate slug if it's empty (don't overwrite manual changes)
         if post.slug.isEmpty {
             post.slug = post.title.lowercased().replacingOccurrences(of: " ", with: "-")
         }
-        
+
         DebugLogger.shared.log("UpdatePost called - remoteID: \(post.remoteID != nil ? "exists" : "nil"), contentHash: \(post.contentHash), lastSyncedHash: \(post.lastSyncedHash), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
+    }
+
+    private func updateWritingSession(wordsWritten: Int) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // Find today's session
+        if let todaySession = sessions.first(where: { calendar.isDate($0.date, inSameDayAs: today) }) {
+            todaySession.wordsWritten = wordsWritten
+            todaySession.modifiedDate = Date()
+        } else {
+            let newSession = WritingSession(date: today, wordsWritten: wordsWritten)
+            modelContext.insert(newSession)
+        }
+
+        try? modelContext.save()
     }
     
     private func openPostOnSite() {
