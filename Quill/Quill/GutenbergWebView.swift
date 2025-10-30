@@ -17,19 +17,32 @@ struct GutenbergWebView: View {
     let fontSize: Int
     let siteConfig: SiteConfiguration?
     @State private var webViewHeight: CGFloat = 600
-    @State private var isLoading = true
+    @State private var isLoading = false
     @State private var hasError = false
     @State private var errorMessage = ""
     @State private var webViewRef: WKWebView?
     
-    private var platformBackgroundColor: Color {
+    private var editorBackgroundColor: Color {
+        // Match the editor's background color exactly
         #if os(macOS)
-        return Color(NSColor.controlBackgroundColor)
+        // Use NSApp.effectiveAppearance to check dark mode
+        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            return Color(red: 0x1e/255.0, green: 0x1e/255.0, blue: 0x1e/255.0) // #1e1e1e
+        } else {
+            return Color.white // #ffffff
+        }
         #else
-        return Color(UIColor.systemBackground)
+        // iOS uses UIColor dynamic colors that adapt to the color scheme
+        return Color(UIColor { traitCollection in
+            if traitCollection.userInterfaceStyle == .dark {
+                return UIColor(red: 0x1e/255.0, green: 0x1e/255.0, blue: 0x1e/255.0, alpha: 1.0)
+            } else {
+                return UIColor.white
+            }
+        })
         #endif
     }
-    
+
     var body: some View {
         ZStack {
             GutenbergWebViewRepresentable(
@@ -45,7 +58,7 @@ struct GutenbergWebView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .opacity(isLoading ? 0 : 1)
-            
+
             if isLoading {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -56,12 +69,10 @@ struct GutenbergWebView: View {
                         .font(.subheadline)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(platformBackgroundColor)
+                .background(editorBackgroundColor)
             }
         }
-        .onAppear {
-            isLoading = true
-        }
+        .background(editorBackgroundColor)
         .onDisappear {
             // Save any pending changes when view disappears
             #if os(macOS)
