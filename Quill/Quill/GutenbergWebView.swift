@@ -21,26 +21,15 @@ struct GutenbergWebView: View {
     @State private var hasError = false
     @State private var errorMessage = ""
     @State private var webViewRef: WKWebView?
-    
+    @Environment(\.colorScheme) private var colorScheme
+
     private var editorBackgroundColor: Color {
-        // Match the editor's background color exactly
-        #if os(macOS)
-        // Use NSApp.effectiveAppearance to check dark mode
-        if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+        // Match the editor's background color exactly and respond to theme changes
+        if colorScheme == .dark {
             return Color(red: 0x1e/255.0, green: 0x1e/255.0, blue: 0x1e/255.0) // #1e1e1e
         } else {
             return Color.white // #ffffff
         }
-        #else
-        // iOS uses UIColor dynamic colors that adapt to the color scheme
-        return Color(UIColor { traitCollection in
-            if traitCollection.userInterfaceStyle == .dark {
-                return UIColor(red: 0x1e/255.0, green: 0x1e/255.0, blue: 0x1e/255.0, alpha: 1.0)
-            } else {
-                return UIColor.white
-            }
-        })
-        #endif
     }
 
     var body: some View {
