@@ -46,5 +46,15 @@ struct QuillApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
+
+        #if os(macOS)
+        Window("New Post", id: "compose") {
+            ComposeWindow()
+                .modelContainer(sharedModelContainer)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultSize(width: 500, height: 300)
+        #endif
     }
 }

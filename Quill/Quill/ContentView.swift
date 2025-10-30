@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showingCompose = false
     @State private var showingSettings = false
     @State private var selectedTab = 0
+    @Environment(\.openWindow) private var openWindow
     
     @StateObject private var syncManager = SyncManager.shared
     @AppStorage("matchSystemAppearance") private var matchSystemAppearance = true
@@ -129,11 +130,6 @@ struct ContentView: View {
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
-        .sheet(isPresented: $showingCompose) {
-            QuickComposeView(isPresented: $showingCompose) { title, content in
-                createPost(title: title, content: content)
-            }
-        }
         .onAppear {
             // Show settings on first run
             if siteConfigs.isEmpty {
@@ -156,6 +152,13 @@ struct ContentView: View {
         .preferredColorScheme(getColorScheme())
         .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
             showingSettings = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("selectPost"))) { notification in
+            if let userInfo = notification.userInfo,
+               let postID = userInfo["postID"] as? UUID,
+               let post = posts.first(where: { $0.id == postID }) {
+                selectedPost = post
+            }
         }
         #endif
     }
@@ -189,6 +192,9 @@ struct PostsListView: View {
     let modelContext: ModelContext
     let siteConfig: SiteConfiguration?
     @State private var showingCompose = false
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     
     var filteredPosts: [Post] {
         posts
@@ -287,12 +293,19 @@ struct PostsListView: View {
             }
             
             ToolbarItem {
-                Button(action: { showingCompose = true }) {
+                Button(action: {
+                    #if os(macOS)
+                    openWindow(id: "compose")
+                    #else
+                    showingCompose = true
+                    #endif
+                }) {
                     Label("New Post", systemImage: "square.and.pencil")
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+        #if os(iOS)
         .sheet(isPresented: $showingCompose) {
             QuickComposeView(isPresented: $showingCompose) { title, content in
                 let post = Post(
@@ -300,11 +313,12 @@ struct PostsListView: View {
                     content: content,
                     status: .draft
                 )
-                
+
                 modelContext.insert(post)
                 selectedPost = post
             }
         }
+        #endif
     }
     
     private func deletePosts(at offsets: IndexSet) {
@@ -957,6 +971,127 @@ struct CreatePostTabView: View {
         selectedTab = 0
     }
 }
+
+// MARK: - Compose Window (macOS)
+
+#if os(macOS)
+struct ComposeWindow: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @Query private var posts: [Post]
+
+    @State private var composeText = ""
+    @State private var postStatus: PostStatus = .draft
+    @State private var showMetadata = false
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TextEditor(text: $composeText)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .focused($isFocused)
+                .padding()
+
+            // Placeholder text
+            if composeText.isEmpty {
+                Text("Just start typing! First line becomes the title.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .padding(.leading, 21)
+                    .padding(.top, 16)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: 500, height: 300)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Spacer()
+            }
+
+            ToolbarItem(placement: .automatic) {
+                Button(action: { showMetadata.toggle() }) {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showMetadata) {
+                    ComposeMetadataView(status: $postStatus)
+                        .frame(width: 360, height: 200)
+                }
+            }
+
+            ToolbarItem(placement: .automatic) {
+                Button("Create") {
+                    createPost()
+                }
+                .buttonStyle(QuillButtonStyle())
+                .disabled(composeText.isEmpty)
+                .keyboardShortcut(.return, modifiers: .command)
+            }
+        }
+        .onAppear {
+            isFocused = true
+        }
+    }
+
+    private func createPost() {
+        let lines = composeText.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+        let title = String(lines.first ?? "")
+        let content = lines.count > 1 ? String(lines[1]) : ""
+
+        let post = Post(
+            title: title,
+            content: content,
+            status: postStatus
+        )
+
+        modelContext.insert(post)
+
+        // Post notification to select the new post in the main window
+        NotificationCenter.default.post(
+            name: Notification.Name("selectPost"),
+            object: nil,
+            userInfo: ["postID": post.id]
+        )
+
+        dismiss()
+    }
+}
+
+struct ComposeMetadataView: View {
+    @Binding var status: PostStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Status picker
+            HStack {
+                Text("Status:")
+                    .frame(width: 80, alignment: .trailing)
+                    .foregroundColor(.primary)
+                Picker("", selection: $status) {
+                    ForEach(PostStatus.allCases, id: \.self) { status in
+                        Text(status.displayName).tag(status)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 120, alignment: .leading)
+                Spacer()
+            }
+
+            Divider()
+                .padding(.vertical, 4)
+
+            Text("You can edit more metadata after creating the post")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+#endif
 
 #Preview {
     ContentView()
