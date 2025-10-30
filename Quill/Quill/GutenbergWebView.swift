@@ -201,11 +201,11 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     --button-secondary-bg: rgba(0, 0, 0, 0.05);
                     --button-secondary-text: #333;
                     --input-border: rgba(0, 0, 0, 0.1);
-                    --slash-menu-bg: rgba(255, 255, 255, 0.95);
+                    --slash-menu-bg: rgba(242, 242, 247, 0.78);
                     --slash-menu-border: rgba(0, 0, 0, 0.1);
                     --slash-menu-shadow: rgba(0, 0, 0, 0.12);
-                    --slash-menu-hover: rgba(0, 102, 204, 0.08);
-                    --slash-menu-text: #1d1d1f;
+                    --slash-menu-hover: #007AFF;
+                    --slash-menu-text: #000;
                     --image-error-bg: #ffebee;
                     --image-error-text: #c62828;
                 }
@@ -227,10 +227,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         --button-secondary-bg: rgba(255, 255, 255, 0.1);
                         --button-secondary-text: #ddd;
                         --input-border: rgba(255, 255, 255, 0.2);
-                        --slash-menu-bg: rgba(40, 40, 40, 0.95);
-                        --slash-menu-border: rgba(255, 255, 255, 0.2);
+                        --slash-menu-bg: rgba(50, 50, 52, 0.78);
+                        --slash-menu-border: rgba(255, 255, 255, 0.1);
                         --slash-menu-shadow: rgba(0, 0, 0, 0.3);
-                        --slash-menu-hover: rgba(102, 179, 255, 0.15);
+                        --slash-menu-hover: #0A84FF;
                         --slash-menu-text: #ffffff;
                         --image-error-bg: #5c2828;
                         --image-error-text: #ff9999;
@@ -524,40 +524,43 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 /* Native macOS-style slash command menu */
                 .slash-command-menu {
                     position: fixed;
-                    background: rgba(255, 255, 255, 0.95);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid rgba(0, 0, 0, 0.1);
-                    border-radius: 8px;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-                    padding: 4px 0;
+                    background: rgba(242, 242, 247, 0.78);
+                    backdrop-filter: blur(30px) saturate(180%);
+                    -webkit-backdrop-filter: blur(30px) saturate(180%);
+                    border: 0.5px solid rgba(0, 0, 0, 0.1);
+                    border-radius: 9px;
+                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
+                    padding: 5px;
                     z-index: 1000;
-                    min-width: 240px;
+                    min-width: 180px;
                     max-height: none;
                     overflow: visible;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
                 }
-                
+
                 .slash-command-item {
-                    padding: 8px 16px;
+                    padding: 5px 8px;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
-                    gap: 12px;
                     font-size: 13px;
-                    color: #1d1d1f;
-                    transition: background-color 0.1s ease;
+                    color: #000;
+                    transition: all 0.08s ease;
+                    border-radius: 5px;
+                    margin: 1px 0;
                 }
-                
+
                 .slash-command-item:hover {
-                    background-color: rgba(0, 122, 255, 0.08);
+                    background-color: #007AFF;
+                    color: #fff;
                 }
-                
+
                 .slash-command-item:first-child {
-                    margin-top: 4px;
+                    margin-top: 0;
                 }
-                
+
                 .slash-command-item:last-child {
-                    margin-bottom: 4px;
+                    margin-bottom: 0;
                 }
                 
                 .loading {
@@ -1323,16 +1326,21 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         
                         // Update block content
                         this.blocks[blockIndex].content = content;
-                        
+
+                        // Handle slash commands
+                        const text = contentElement.innerText;
+
                         // Skip slash command processing if we just hid slash commands via backspace
-                        if (this.justHidSlashCommands) {
+                        // BUT allow it if the text is now "/" (user typed "/" again)
+                        if (this.justHidSlashCommands && text !== '/') {
                             this.justHidSlashCommands = false;
                             this.handleContentChange();
                             return;
                         }
-                        
-                        // Handle slash commands
-                        const text = contentElement.innerText;
+
+                        // Clear the flag if we're processing slash commands
+                        this.justHidSlashCommands = false;
+
                         if (text.startsWith('/')) {
                             if (text.length === 1) {
                                 // Show slash commands when text is exactly '/'
@@ -1553,16 +1561,16 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         }
                         
                         const commands = [
-                            { name: 'Paragraph', type: 'paragraph', icon: '¶' },
-                            { name: 'Heading 1', type: 'heading-1', icon: 'H1' },
-                            { name: 'Heading 2', type: 'heading-2', icon: 'H2' },
-                            { name: 'Heading 3', type: 'heading-3', icon: 'H3' },
-                            { name: 'Bulleted List', type: 'list', icon: '•' },
-                            { name: 'Numbered List', type: 'ordered-list', icon: '1.' },
-                            { name: 'Code', type: 'code', icon: '</>' },
-                            { name: 'Quote', type: 'quote', icon: '"' },
-                            { name: 'Pullquote', type: 'pullquote', icon: '❝' },
-                            { name: 'Image', type: 'image', icon: '🖼' }
+                            { name: 'Paragraph', type: 'paragraph' },
+                            { name: 'Heading 1', type: 'heading-1' },
+                            { name: 'Heading 2', type: 'heading-2' },
+                            { name: 'Heading 3', type: 'heading-3' },
+                            { name: 'Bulleted List', type: 'list' },
+                            { name: 'Numbered List', type: 'ordered-list' },
+                            { name: 'Code', type: 'code' },
+                            { name: 'Quote', type: 'quote' },
+                            { name: 'Pullquote', type: 'pullquote' },
+                            { name: 'Image', type: 'image' }
                         ];
                         
                         this.slashCommandMenu = document.createElement('div');
@@ -1570,13 +1578,14 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.slashCommandMenu.style.cssText = `
                             position: absolute;
                             background: var(--slash-menu-bg);
-                            backdrop-filter: blur(20px);
-                            border: 1px solid var(--slash-menu-border);
-                            border-radius: 8px;
-                            box-shadow: 0 8px 32px var(--slash-menu-shadow);
-                            padding: 4px 0;
+                            backdrop-filter: blur(30px) saturate(180%);
+                            -webkit-backdrop-filter: blur(30px) saturate(180%);
+                            border: 0.5px solid var(--slash-menu-border);
+                            border-radius: 9px;
+                            box-shadow: 0 8px 30px var(--slash-menu-shadow), 0 0 1px rgba(0, 0, 0, 0.1);
+                            padding: 5px;
                             z-index: 1000;
-                            min-width: 240px;
+                            min-width: 180px;
                             max-height: none;
                             overflow: visible;
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
@@ -1591,25 +1600,26 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             item.setAttribute('data-command-index', index);
                             item.setAttribute('data-command-type', command.type);
                             item.style.cssText = `
-                                padding: 8px 16px;
+                                padding: 5px 8px;
                                 cursor: pointer;
                                 display: flex;
                                 align-items: center;
-                                gap: 12px;
                                 font-size: 13px;
                                 color: var(--slash-menu-text);
-                                transition: background-color 0.1s ease;
-                                margin: 2px 0;
+                                transition: all 0.08s ease;
+                                border-radius: 5px;
+                                margin: 1px 0;
                             `;
                             
                             // Auto-select first item
                             if (index === 0) {
                                 item.style.backgroundColor = 'var(--slash-menu-hover)';
+                                item.style.borderRadius = '5px';
+                                item.style.color = '#fff';
                                 item.classList.add('selected');
                             }
                             
                             item.innerHTML = `
-                                <span style="font-size: 14px;">${command.icon}</span>
                                 <span>${command.name}</span>
                             `;
                             
@@ -1635,14 +1645,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     
                     selectCommandItem(index) {
                         const items = this.slashCommandMenu.querySelectorAll('.slash-command-item');
-                        
+
                         // Clear previous selection
                         items.forEach((item, i) => {
                             if (i === index) {
                                 item.style.backgroundColor = 'var(--slash-menu-hover)';
+                                item.style.borderRadius = '5px';
+                                item.style.color = '#fff';
                                 item.classList.add('selected');
                             } else {
                                 item.style.backgroundColor = 'transparent';
+                                item.style.borderRadius = '5px';
+                                item.style.color = 'var(--slash-menu-text)';
                                 item.classList.remove('selected');
                             }
                         });
@@ -3231,11 +3245,11 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     --button-secondary-bg: rgba(0, 0, 0, 0.05);
                     --button-secondary-text: #333;
                     --input-border: rgba(0, 0, 0, 0.1);
-                    --slash-menu-bg: rgba(255, 255, 255, 0.95);
+                    --slash-menu-bg: rgba(242, 242, 247, 0.78);
                     --slash-menu-border: rgba(0, 0, 0, 0.1);
                     --slash-menu-shadow: rgba(0, 0, 0, 0.12);
-                    --slash-menu-hover: rgba(0, 102, 204, 0.08);
-                    --slash-menu-text: #1d1d1f;
+                    --slash-menu-hover: #007AFF;
+                    --slash-menu-text: #000;
                     --image-error-bg: #ffebee;
                     --image-error-text: #c62828;
                 }
@@ -3257,10 +3271,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         --button-secondary-bg: rgba(255, 255, 255, 0.1);
                         --button-secondary-text: #ddd;
                         --input-border: rgba(255, 255, 255, 0.2);
-                        --slash-menu-bg: rgba(40, 40, 40, 0.95);
-                        --slash-menu-border: rgba(255, 255, 255, 0.2);
+                        --slash-menu-bg: rgba(50, 50, 52, 0.78);
+                        --slash-menu-border: rgba(255, 255, 255, 0.1);
                         --slash-menu-shadow: rgba(0, 0, 0, 0.3);
-                        --slash-menu-hover: rgba(102, 179, 255, 0.15);
+                        --slash-menu-hover: #0A84FF;
                         --slash-menu-text: #ffffff;
                         --image-error-bg: #5c2828;
                         --image-error-text: #ff9999;
@@ -3420,40 +3434,43 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 /* Native macOS-style slash command menu */
                 .slash-command-menu {
                     position: fixed;
-                    background: rgba(255, 255, 255, 0.95);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid rgba(0, 0, 0, 0.1);
-                    border-radius: 8px;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-                    padding: 4px 0;
+                    background: rgba(242, 242, 247, 0.78);
+                    backdrop-filter: blur(30px) saturate(180%);
+                    -webkit-backdrop-filter: blur(30px) saturate(180%);
+                    border: 0.5px solid rgba(0, 0, 0, 0.1);
+                    border-radius: 9px;
+                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
+                    padding: 5px;
                     z-index: 1000;
-                    min-width: 240px;
+                    min-width: 180px;
                     max-height: none;
                     overflow: visible;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
                 }
-                
+
                 .slash-command-item {
-                    padding: 8px 16px;
+                    padding: 5px 8px;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
-                    gap: 12px;
                     font-size: 13px;
-                    color: #1d1d1f;
-                    transition: background-color 0.1s ease;
+                    color: #000;
+                    transition: all 0.08s ease;
+                    border-radius: 5px;
+                    margin: 1px 0;
                 }
-                
+
                 .slash-command-item:hover {
-                    background-color: rgba(0, 122, 255, 0.08);
+                    background-color: #007AFF;
+                    color: #fff;
                 }
-                
+
                 .slash-command-item:first-child {
-                    margin-top: 4px;
+                    margin-top: 0;
                 }
-                
+
                 .slash-command-item:last-child {
-                    margin-bottom: 4px;
+                    margin-bottom: 0;
                 }
                 
                 
@@ -4151,16 +4168,21 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         
                         // Update block content
                         this.blocks[blockIndex].content = content;
-                        
+
+                        // Handle slash commands
+                        const text = contentElement.innerText;
+
                         // Skip slash command processing if we just hid slash commands via backspace
-                        if (this.justHidSlashCommands) {
+                        // BUT allow it if the text is now "/" (user typed "/" again)
+                        if (this.justHidSlashCommands && text !== '/') {
                             this.justHidSlashCommands = false;
                             this.handleContentChange();
                             return;
                         }
-                        
-                        // Handle slash commands
-                        const text = contentElement.innerText;
+
+                        // Clear the flag if we're processing slash commands
+                        this.justHidSlashCommands = false;
+
                         if (text.startsWith('/')) {
                             if (text.length === 1) {
                                 // Show slash commands when text is exactly '/'
@@ -4507,16 +4529,16 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         }
                         
                         const commands = [
-                            { name: 'Paragraph', type: 'paragraph', icon: '¶' },
-                            { name: 'Heading 1', type: 'heading-1', icon: 'H1' },
-                            { name: 'Heading 2', type: 'heading-2', icon: 'H2' },
-                            { name: 'Heading 3', type: 'heading-3', icon: 'H3' },
-                            { name: 'Bulleted List', type: 'list', icon: '•' },
-                            { name: 'Numbered List', type: 'ordered-list', icon: '1.' },
-                            { name: 'Code', type: 'code', icon: '</>' },
-                            { name: 'Quote', type: 'quote', icon: '"' },
-                            { name: 'Pullquote', type: 'pullquote', icon: '❝' },
-                            { name: 'Image', type: 'image', icon: '🖼' }
+                            { name: 'Paragraph', type: 'paragraph' },
+                            { name: 'Heading 1', type: 'heading-1' },
+                            { name: 'Heading 2', type: 'heading-2' },
+                            { name: 'Heading 3', type: 'heading-3' },
+                            { name: 'Bulleted List', type: 'list' },
+                            { name: 'Numbered List', type: 'ordered-list' },
+                            { name: 'Code', type: 'code' },
+                            { name: 'Quote', type: 'quote' },
+                            { name: 'Pullquote', type: 'pullquote' },
+                            { name: 'Image', type: 'image' }
                         ];
                         
                         this.slashCommandMenu = document.createElement('div');
@@ -4524,13 +4546,14 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.slashCommandMenu.style.cssText = `
                             position: absolute;
                             background: var(--slash-menu-bg);
-                            backdrop-filter: blur(20px);
-                            border: 1px solid var(--slash-menu-border);
-                            border-radius: 8px;
-                            box-shadow: 0 8px 32px var(--slash-menu-shadow);
-                            padding: 4px 0;
+                            backdrop-filter: blur(30px) saturate(180%);
+                            -webkit-backdrop-filter: blur(30px) saturate(180%);
+                            border: 0.5px solid var(--slash-menu-border);
+                            border-radius: 9px;
+                            box-shadow: 0 8px 30px var(--slash-menu-shadow), 0 0 1px rgba(0, 0, 0, 0.1);
+                            padding: 5px;
                             z-index: 1000;
-                            min-width: 240px;
+                            min-width: 180px;
                             max-height: none;
                             overflow: visible;
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
@@ -4545,25 +4568,26 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             item.setAttribute('data-command-index', index);
                             item.setAttribute('data-command-type', command.type);
                             item.style.cssText = `
-                                padding: 8px 16px;
+                                padding: 5px 8px;
                                 cursor: pointer;
                                 display: flex;
                                 align-items: center;
-                                gap: 12px;
                                 font-size: 13px;
                                 color: var(--slash-menu-text);
-                                transition: background-color 0.1s ease;
-                                margin: 2px 0;
+                                transition: all 0.08s ease;
+                                border-radius: 5px;
+                                margin: 1px 0;
                             `;
                             
                             // Auto-select first item
                             if (index === 0) {
                                 item.style.backgroundColor = 'var(--slash-menu-hover)';
+                                item.style.borderRadius = '5px';
+                                item.style.color = '#fff';
                                 item.classList.add('selected');
                             }
                             
                             item.innerHTML = `
-                                <span style="font-size: 14px;">${command.icon}</span>
                                 <span>${command.name}</span>
                             `;
                             
@@ -4589,14 +4613,18 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     
                     selectCommandItem(index) {
                         const items = this.slashCommandMenu.querySelectorAll('.slash-command-item');
-                        
+
                         // Clear previous selection
                         items.forEach((item, i) => {
                             if (i === index) {
                                 item.style.backgroundColor = 'var(--slash-menu-hover)';
+                                item.style.borderRadius = '5px';
+                                item.style.color = '#fff';
                                 item.classList.add('selected');
                             } else {
                                 item.style.backgroundColor = 'transparent';
+                                item.style.borderRadius = '5px';
+                                item.style.color = 'var(--slash-menu-text)';
                                 item.classList.remove('selected');
                             }
                         });
