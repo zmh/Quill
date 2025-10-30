@@ -416,6 +416,7 @@ struct PostRowView: View {
 struct PostEditorView: View {
     @Bindable var post: Post
     @State private var showMetadata = false
+    @State private var showStatistics = false
     @State private var currentPostID: UUID?
     @AppStorage("showWordCount") private var showWordCount = true
     @AppStorage("editorTypeface") private var editorTypeface = "system"
@@ -423,7 +424,7 @@ struct PostEditorView: View {
     @State private var webViewKey = UUID() // Force WebView refresh when settings change
     @Query private var siteConfigs: [SiteConfiguration]
     @State private var lastLoadedPostID: UUID?
-    
+
     // Publish workflow state
     @State private var isPublishing = false
     @State private var publishError: Error?
@@ -456,9 +457,16 @@ struct PostEditorView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if showWordCount {
-                    Text("\(post.wordCount) words")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Button(action: { showStatistics.toggle() }) {
+                        Text("\(post.wordCount) words")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showStatistics, arrowEdge: .bottom) {
+                        let statistics = TextStatisticsCalculator.calculate(from: post.content)
+                        TextStatisticsPopover(statistics: statistics)
+                    }
                 }
             }
             
@@ -473,7 +481,7 @@ struct PostEditorView: View {
                 Button(action: { showMetadata.toggle() }) {
                     Image(systemName: "info.circle")
                 }
-                .popover(isPresented: $showMetadata) {
+                .popover(isPresented: $showMetadata, arrowEdge: .bottom) {
                     PostMetadataView(post: post)
                         .frame(width: 360, height: 280)
                 }
