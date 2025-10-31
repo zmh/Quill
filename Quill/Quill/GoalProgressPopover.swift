@@ -46,7 +46,7 @@ struct GoalProgressPopover: View {
                 .padding(16)
             }
         }
-        .frame(width: 320, height: 400)
+        .frame(width: 320, height: 340)
     }
 }
 
@@ -201,6 +201,8 @@ struct HistoryView: View {
                                 .fill(session != nil ? Color.blue.opacity(0.8) : Color.gray.opacity(0.2))
                                 .frame(width: 32, height: max(4, CGFloat(session?.wordsWritten ?? 0) / CGFloat(max(maxWords, 1)) * 100))
                                 .cornerRadius(4)
+                                .rotationEffect(.degrees(180))
+                                .rotation3DEffect(.degrees(180), axis: (x: 1, y: 0, z: 0))
 
                             // Day label
                             Text(dayLabel(for: date))
@@ -208,8 +210,6 @@ struct HistoryView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    .rotationEffect(.degrees(180))
-                    .rotation3DEffect(.degrees(180), axis: (x: 1, y: 0, z: 0))
                 }
                 .frame(height: 120)
             }

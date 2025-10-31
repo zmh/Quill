@@ -19,8 +19,9 @@ struct ContentView: View {
     @State private var showingCompose = false
     @State private var showingSettings = false
     @State private var selectedTab = 0
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.openWindow) private var openWindow
-    
+
     @StateObject private var syncManager = SyncManager.shared
     @AppStorage("matchSystemAppearance") private var matchSystemAppearance = true
     @AppStorage("preferredAppearance") private var preferredAppearance = "light"
@@ -93,7 +94,7 @@ struct ContentView: View {
             selectedTab = 2
         }
         #else
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             // Posts List
             PostsListView(
                 posts: posts,
@@ -102,7 +103,8 @@ struct ContentView: View {
                 filterStatus: $filterStatus,
                 syncManager: syncManager,
                 modelContext: modelContext,
-                siteConfig: siteConfigs.first
+                siteConfig: siteConfigs.first,
+                isSidebarVisible: columnVisibility == .all
             )
             .alert("Sync Error", isPresented: .constant(syncManager.lastError != nil)) {
                 Button("OK") {
@@ -122,14 +124,6 @@ struct ContentView: View {
             }
         }
         .navigationTitle("")
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button(action: { showingSettings = true }) {
-                    Label("Settings", systemImage: "gear")
-                }
-                .keyboardShortcut(",", modifiers: .command)
-            }
-        }
         .onAppear {
             // Show settings on first run
             if siteConfigs.isEmpty {
@@ -143,7 +137,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
-                .modelContainer(for: [SiteConfiguration.self, Post.self])
                 #if os(iOS)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -191,7 +184,11 @@ struct PostsListView: View {
     let syncManager: SyncManager
     let modelContext: ModelContext
     let siteConfig: SiteConfiguration?
+    var isSidebarVisible: Bool = true
     @State private var showingCompose = false
+    @State private var showGoalProgress = false
+    @AppStorage("writingGoalEnabled") private var writingGoalEnabled = false
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -275,34 +272,54 @@ struct PostsListView: View {
         #endif
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                if syncManager.isSyncing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.8)
-                } else {
-                    Button(action: {
-                        if let siteConfig = siteConfig {
-                            Task { @MainActor in
-                                await syncManager.syncPosts(siteConfig: siteConfig, modelContext: modelContext)
-                            }
+                if writingGoalEnabled {
+                    GoalProgressButton(showGoalProgress: $showGoalProgress)
+                        .popover(isPresented: $showGoalProgress, arrowEdge: .bottom) {
+                            GoalProgressPopover()
                         }
-                    }) {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
                 }
             }
-            
-            ToolbarItem {
-                Button(action: {
-                    #if os(macOS)
-                    openWindow(id: "compose")
-                    #else
-                    showingCompose = true
-                    #endif
-                }) {
-                    Label("New Post", systemImage: "square.and.pencil")
+
+            if isSidebarVisible {
+                ToolbarItem {
+                    Button(action: {
+                        NotificationCenter.default.post(name: .openSettings, object: nil)
+                    }) {
+                        Label("Settings", systemImage: "gear")
+                    }
+                    .keyboardShortcut(",", modifiers: .command)
                 }
-                .keyboardShortcut("n", modifiers: .command)
+
+                ToolbarItem(placement: .automatic) {
+                    if syncManager.isSyncing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.8)
+                    } else {
+                        Button(action: {
+                            if let siteConfig = siteConfig {
+                                Task { @MainActor in
+                                    await syncManager.syncPosts(siteConfig: siteConfig, modelContext: modelContext)
+                                }
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                    }
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: {
+                        #if os(macOS)
+                        openWindow(id: "compose")
+                        #else
+                        showingCompose = true
+                        #endif
+                    }) {
+                        Label("New Post", systemImage: "square.and.pencil")
+                    }
+                    .keyboardShortcut("n", modifiers: .command)
+                }
             }
         }
         #if os(iOS)
@@ -421,6 +438,7 @@ struct PostEditorView: View {
     @State private var showGoalProgress = false
     @State private var currentPostID: UUID?
     @State private var sessionStartWordCount: Int = 0
+    @State private var lastRecordedSessionWords: Int = 0
     @AppStorage("showWordCount") private var showWordCount = true
     @AppStorage("editorTypeface") private var editorTypeface = "system"
     @AppStorage("editorFontSize") private var editorFontSize = 16
@@ -491,15 +509,6 @@ struct PostEditorView: View {
                         .frame(width: 360, height: 280)
                 }
 
-                if writingGoalEnabled {
-                    Button(action: { showGoalProgress.toggle() }) {
-                        Image(systemName: "target")
-                    }
-                    .popover(isPresented: $showGoalProgress, arrowEdge: .bottom) {
-                        GoalProgressPopover()
-                    }
-                }
-
                 Button(action: { publishPost() }) {
                     Text(isPublishing ? "Publishing..." : getButtonText())
                 }
@@ -536,6 +545,7 @@ struct PostEditorView: View {
             if currentPostID != newPostID {
                 currentPostID = newPostID
                 sessionStartWordCount = post.wordCount
+                lastRecordedSessionWords = 0 // Reset for new post
                 // Force WebView recreation to ensure clean state
                 if lastLoadedPostID != newPostID {
                     lastLoadedPostID = newPostID
@@ -552,6 +562,7 @@ struct PostEditorView: View {
         .onAppear {
             currentPostID = post.id
             sessionStartWordCount = post.wordCount
+            lastRecordedSessionWords = 0 // Reset for new editing session
             // Don't initialize hash here - let WebView handle it after content is processed
         }
         .alert("Publish Error", isPresented: $showPublishError) {
@@ -681,6 +692,7 @@ struct PostEditorView: View {
         // Track word count changes for writing goals
         if writingGoalEnabled {
             let wordsWrittenInSession = max(0, newWordCount - sessionStartWordCount)
+            DebugLogger.shared.log("Goal tracking - newWordCount: \(newWordCount), sessionStart: \(sessionStartWordCount), wordsWrittenInSession: \(wordsWrittenInSession), lastRecorded: \(lastRecordedSessionWords)", level: .info, source: "ContentView")
             if wordsWrittenInSession > 0 {
                 updateWritingSession(wordsWritten: wordsWrittenInSession)
             }
@@ -701,16 +713,35 @@ struct PostEditorView: View {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        // Find today's session
-        if let todaySession = sessions.first(where: { calendar.isDate($0.date, inSameDayAs: today) }) {
-            todaySession.wordsWritten = wordsWritten
-            todaySession.modifiedDate = Date()
-        } else {
-            let newSession = WritingSession(date: today, wordsWritten: wordsWritten)
-            modelContext.insert(newSession)
+        // Calculate the delta from last update
+        let delta = wordsWritten - lastRecordedSessionWords
+        DebugLogger.shared.log("updateWritingSession - wordsWritten: \(wordsWritten), delta: \(delta)", level: .info, source: "ContentView")
+
+        if delta <= 0 {
+            DebugLogger.shared.log("Delta is <= 0, skipping update", level: .info, source: "ContentView")
+            return // No new words or words were deleted
         }
 
-        try? modelContext.save()
+        // Find or create today's session
+        if let todaySession = sessions.first(where: { calendar.isDate($0.date, inSameDayAs: today) }) {
+            // Accumulate the delta
+            let oldWords = todaySession.wordsWritten
+            todaySession.wordsWritten += delta
+            todaySession.modifiedDate = Date()
+            DebugLogger.shared.log("Updated existing session: \(oldWords) -> \(todaySession.wordsWritten)", level: .info, source: "ContentView")
+        } else {
+            let newSession = WritingSession(date: today, wordsWritten: delta)
+            modelContext.insert(newSession)
+            DebugLogger.shared.log("Created new session with \(delta) words", level: .info, source: "ContentView")
+        }
+
+        lastRecordedSessionWords = wordsWritten
+        do {
+            try modelContext.save()
+            DebugLogger.shared.log("✅ Session saved successfully", level: .info, source: "ContentView")
+        } catch {
+            DebugLogger.shared.log("❌ Failed to save session: \(error)", level: .error, source: "ContentView")
+        }
     }
     
     private func openPostOnSite() {

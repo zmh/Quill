@@ -50,9 +50,8 @@ class WritingGoalManager {
 
     func getTodayProgress(sessions: [WritingSession]) -> Int {
         let today = Calendar.current.startOfDay(for: Date())
-        return sessions
-            .filter { Calendar.current.isDate($0.date, inSameDayAs: today) }
-            .reduce(0) { $0 + $1.wordsWritten }
+        let todaySessions = sessions.filter { Calendar.current.isDate($0.date, inSameDayAs: today) }
+        return todaySessions.reduce(0) { $0 + $1.wordsWritten }
     }
 
     func getWeekProgress(sessions: [WritingSession]) -> Int {
@@ -116,24 +115,6 @@ class WritingGoalManager {
         return streak
     }
 
-    // MARK: - Session Management
-
-    func recordWords(_ wordCount: Int, on date: Date = Date(), sessions: [WritingSession], modelContext: ModelContext) {
-        let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: date)
-
-        // Find or create session for today
-        if let existingSession = sessions.first(where: { calendar.isDate($0.date, inSameDayAs: dayStart) }) {
-            existingSession.wordsWritten = wordCount
-            existingSession.modifiedDate = Date()
-        } else {
-            let newSession = WritingSession(date: dayStart, wordsWritten: wordCount)
-            modelContext.insert(newSession)
-        }
-
-        try? modelContext.save()
-    }
-
     // MARK: - History & Statistics
 
     func getRecentSessions(sessions: [WritingSession], days: Int = 7) -> [WritingSession] {
@@ -145,23 +126,5 @@ class WritingGoalManager {
         return sessions
             .filter { $0.date >= startDate }
             .sorted { $0.date > $1.date }
-    }
-
-    func getWeeklyHistory(sessions: [WritingSession], weeks: Int = 4) -> [(week: Date, total: Int)] {
-        let calendar = Calendar.current
-        guard let startDate = calendar.date(byAdding: .weekOfYear, value: -weeks, to: Date()) else {
-            return []
-        }
-
-        // Group by week
-        let weeklyTotals = Dictionary(grouping: sessions.filter { $0.date >= startDate }) { session in
-            calendar.dateInterval(of: .weekOfYear, for: session.date)?.start ?? session.date
-        }.mapValues { weekSessions in
-            weekSessions.reduce(0) { $0 + $1.wordsWritten }
-        }
-
-        return weeklyTotals
-            .map { (week: $0.key, total: $0.value) }
-            .sorted { $0.week > $1.week }
     }
 }
