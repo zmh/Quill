@@ -35,6 +35,9 @@ struct SettingsView: View {
     @AppStorage("showAbsoluteDates") private var showAbsoluteDates = false
     @AppStorage("editorTypeface") private var editorTypeface = "system"
     @AppStorage("editorFontSize") private var editorFontSize = 16
+    @AppStorage("writingGoalEnabled") private var writingGoalEnabled = false
+    @AppStorage("writingGoalTarget") private var writingGoalTarget = 500
+    @AppStorage("writingGoalPeriod") private var writingGoalPeriod = "daily"
     
     private var platformBackgroundColor: Color {
         #if os(macOS)
@@ -89,7 +92,10 @@ struct SettingsView: View {
                             enableAutoSave: $enableAutoSave,
                             showAbsoluteDates: $showAbsoluteDates,
                             editorTypeface: $editorTypeface,
-                            editorFontSize: $editorFontSize
+                            editorFontSize: $editorFontSize,
+                            writingGoalEnabled: $writingGoalEnabled,
+                            writingGoalTarget: $writingGoalTarget,
+                            writingGoalPeriod: $writingGoalPeriod
                         )
                         .navigationBarHidden(true)
                     }
@@ -103,7 +109,10 @@ struct SettingsView: View {
                             enableAutoSave: $enableAutoSave,
                             showAbsoluteDates: $showAbsoluteDates,
                             editorTypeface: $editorTypeface,
-                            editorFontSize: $editorFontSize
+                            editorFontSize: $editorFontSize,
+                            writingGoalEnabled: $writingGoalEnabled,
+                            writingGoalTarget: $writingGoalTarget,
+                            writingGoalPeriod: $writingGoalPeriod
                         )
                         .frame(maxWidth: .infinity)
                     }
@@ -316,6 +325,9 @@ struct GeneralSettingsView: View {
     @Binding var showAbsoluteDates: Bool
     @Binding var editorTypeface: String
     @Binding var editorFontSize: Int
+    @Binding var writingGoalEnabled: Bool
+    @Binding var writingGoalTarget: Int
+    @Binding var writingGoalPeriod: String
     
     private var typefaceDisplayName: String {
         switch editorTypeface {
@@ -376,6 +388,36 @@ struct GeneralSettingsView: View {
                 Toggle("Show Absolute Dates", isOn: $showAbsoluteDates)
             } header: {
                 Text("EDITOR")
+            }
+
+            Section {
+                Toggle("Enable Writing Goal", isOn: $writingGoalEnabled)
+
+                if writingGoalEnabled {
+                    HStack {
+                        Text("Goal Period")
+                        Spacer()
+                        Picker("Goal Period", selection: $writingGoalPeriod) {
+                            Text("Daily").tag("daily")
+                            Text("Weekly").tag("weekly")
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 140)
+                    }
+
+                    HStack {
+                        Text("Target Words")
+                        Spacer()
+                        TextField("500", value: $writingGoalTarget, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("words")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            } header: {
+                Text("WRITING GOALS")
             }
         }
         #else
@@ -460,7 +502,43 @@ struct GeneralSettingsView: View {
                     }
                 }
             }
-            
+
+            // Writing Goals section
+            VStack(alignment: .leading, spacing: 12) {
+                SettingsRow(label: "Writing goals:") {
+                    HStack {
+                        Toggle("Enable writing goal", isOn: $writingGoalEnabled)
+                            .toggleStyle(.checkbox)
+                        Spacer()
+                    }
+                }
+
+                if writingGoalEnabled {
+                    SettingsRow(label: "Goal period:") {
+                        HStack {
+                            Picker("", selection: $writingGoalPeriod) {
+                                Text("Daily").tag("daily")
+                                Text("Weekly").tag("weekly")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 150)
+                            Spacer()
+                        }
+                    }
+
+                    SettingsRow(label: "Target words:") {
+                        HStack {
+                            TextField("500", value: $writingGoalTarget, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 80)
+                            Text("words")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+
             Spacer()
         }
         .padding(20)

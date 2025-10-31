@@ -18,6 +18,7 @@ struct QuillApp: App {
         let schema = Schema([
             Post.self,
             SiteConfiguration.self,
+            WritingSession.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
