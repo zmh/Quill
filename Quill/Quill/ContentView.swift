@@ -118,9 +118,7 @@ struct ContentView: View {
             if let post = selectedPost {
                 PostEditorView(post: post)
             } else {
-                Text("Select a post to edit")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: CGFloat.infinity, maxHeight: CGFloat.infinity)
+                WriterQuoteEmptyStateView()
             }
         }
         .navigationTitle("")
