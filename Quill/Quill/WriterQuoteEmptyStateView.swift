@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct WriterQuote {
     let quote: String
@@ -40,23 +43,47 @@ struct WriterQuoteEmptyStateView: View {
 
     @State private var currentQuoteIndex = 0
 
+    private var backgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: NSColor.windowBackgroundColor)
+        #else
+        Color(UIColor.secondarySystemBackground)
+        #endif
+    }
+
+    private var quoteTextColor: Color {
+        #if os(macOS)
+        Color(nsColor: NSColor.secondaryLabelColor)
+        #else
+        Color(UIColor.secondaryLabel)
+        #endif
+    }
+
+    private var authorTextColor: Color {
+        #if os(macOS)
+        Color(nsColor: NSColor.tertiaryLabelColor)
+        #else
+        Color(UIColor.tertiaryLabel)
+        #endif
+    }
+
     var body: some View {
         ZStack {
             // Background with subtle texture
-            Color(white: 0.94)
+            backgroundColor
 
             // Writer quote section - centered
             VStack(spacing: 8) {
                 Text("\"\(quotes[currentQuoteIndex].quote)\"")
                     .font(.body)
                     .italic()
-                    .foregroundStyle(Color(white: 0.7))
+                    .foregroundStyle(quoteTextColor)
                     .multilineTextAlignment(.center)
 
                 Text("— \(quotes[currentQuoteIndex].author)")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(Color(white: 0.7))
+                    .foregroundStyle(authorTextColor)
             }
             .frame(maxWidth: 400)
             .id(currentQuoteIndex) // For animation when quote changes

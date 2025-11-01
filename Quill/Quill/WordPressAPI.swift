@@ -111,7 +111,10 @@ class WordPressAPI {
         
         DebugLogger.shared.log("Response status code: \(httpResponse.statusCode)", level: .info, source: "WordPressAPI")
         
-        if httpResponse.statusCode == 201 {
+        if httpResponse.statusCode == 201 || httpResponse.statusCode == 200 {
+            if httpResponse.statusCode == 200 {
+                DebugLogger.shared.log("Received HTTP 200 on image upload; treating as success", level: .warning, source: "WordPressAPI")
+            }
             do {
                 let decoder = JSONDecoder()
                 let media = try decoder.decode(WordPressMedia.self, from: data)
