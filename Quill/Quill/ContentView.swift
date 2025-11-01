@@ -226,7 +226,7 @@ struct PostsListView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal)
+            .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .padding(.bottom, 4)
             
@@ -279,7 +279,7 @@ struct PostsListView: View {
             }
 
             if isSidebarVisible {
-                ToolbarItem {
+                ToolbarItem(placement: .automatic) {
                     Button(action: {
                         NotificationCenter.default.post(name: .openSettings, object: nil)
                     }) {
@@ -304,6 +304,10 @@ struct PostsListView: View {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                     }
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Spacer()
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -386,7 +390,7 @@ struct PostRowView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(post.titlePlainText.isEmpty ? "Untitled" : post.titlePlainText)
-                    .font(.headline)
+                    .font(.body)
                     .lineLimit(2)
                 
                 Spacer()
