@@ -458,17 +458,6 @@ struct PostEditorView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Title field
-            TextField("Title", text: $post.titlePlainText)
-                .font(.title)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
-            
-            Divider()
-                .padding(.horizontal, 20)
-            
             // Gutenberg WebView editor
             GutenbergWebView(
                 post: post,
@@ -480,7 +469,7 @@ struct PostEditorView: View {
             .id(webViewKey) // Force recreation when key changes
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .navigation) {
                 if showWordCount {
                     Button(action: { showStatistics.toggle() }) {
                         Text("\(post.wordCount) words")
@@ -494,7 +483,15 @@ struct PostEditorView: View {
                     }
                 }
             }
-            
+
+            ToolbarItem(placement: .principal) {
+                TextField("Title", text: $post.titlePlainText)
+                    .font(.headline)
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 400)
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 if siteConfigs.first != nil, post.remoteID != nil {
                     Button(action: { openPostOnSite() }) {
