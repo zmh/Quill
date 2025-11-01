@@ -509,7 +509,7 @@ struct PostEditorView: View {
                 }
 
                 Button(action: { publishPost() }) {
-                    Text(isPublishing ? "Publishing..." : getButtonText())
+                    Text(isPublishing ? getProgressButtonText() : getButtonText())
                 }
                 .buttonStyle(QuillButtonStyle())
                 .disabled(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges)
@@ -581,6 +581,14 @@ struct PostEditorView: View {
             // Existing post - always "Update"
             return "Update"
         }
+    }
+
+    private func getProgressButtonText() -> String {
+        let buttonText = getButtonText()
+        if buttonText == "Update" {
+            return "Updating..."
+        }
+        return "Publishing..."
     }
     
     private func publishPost() {
@@ -890,16 +898,6 @@ struct PostMetadataView: View {
             
             Divider()
                 .padding(.vertical, 4)
-            
-            // Statistics
-            HStack {
-                Text("Words:")
-                    .frame(width: 80, alignment: .trailing)
-                    .foregroundColor(.primary)
-                Text("\(post.wordCount)")
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
             
             HStack {
                 Text("Created:")

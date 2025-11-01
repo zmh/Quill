@@ -208,6 +208,11 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     --slash-menu-text: #000;
                     --image-error-bg: #ffebee;
                     --image-error-text: #c62828;
+                    --image-placeholder-bg: rgba(0, 0, 0, 0.04);
+                    --image-placeholder-border: rgba(0, 0, 0, 0.08);
+                    --image-placeholder-text: rgba(60, 60, 67, 0.6);
+                    --image-placeholder-overlay: rgba(255, 255, 255, 0.74);
+                    --image-placeholder-overlay: rgba(255, 255, 255, 0.74);
                 }
                 
                 @media (prefers-color-scheme: dark) {
@@ -234,6 +239,11 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         --slash-menu-text: #ffffff;
                         --image-error-bg: #5c2828;
                         --image-error-text: #ff9999;
+                        --image-placeholder-bg: rgba(255, 255, 255, 0.08);
+                        --image-placeholder-border: rgba(255, 255, 255, 0.16);
+                        --image-placeholder-text: rgba(235, 235, 245, 0.7);
+                        --image-placeholder-overlay: rgba(0, 0, 0, 0.55);
+                        --image-placeholder-overlay: rgba(0, 0, 0, 0.55);
                     }
                 }
                 
@@ -507,13 +517,121 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 
                 .image-loading {
                     position: relative;
-                    padding: 40px;
+                    padding: 24px;
                     text-align: center;
-                    color: #666;
-                    background: #f5f5f5;
-                    border-radius: 4px;
+                    color: var(--image-placeholder-text);
+                    background: var(--image-placeholder-bg);
+                    border-radius: 8px;
+                    border: 1px dashed var(--image-placeholder-border);
+                    min-height: 140px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    font-style: normal;
+                }
+
+                .image-loading .image-loading-spinner {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    border: 3px solid var(--image-placeholder-border);
+                    border-top-color: var(--link-color);
+                    animation: quill-spin 1s linear infinite;
+                }
+
+                .image-loading .image-loading-text {
+                    font-size: 14px;
                     font-style: italic;
-                    min-height: 200px;
+                }
+
+                .image-loading--preview {
+                    position: relative;
+                    padding: 0;
+                    background: var(--image-placeholder-bg);
+                    border: 1px solid var(--image-placeholder-border);
+                    min-height: 0;
+                    display: block;
+                    overflow: hidden;
+                }
+
+                .image-loading--preview img {
+                    display: block;
+                    width: 100%;
+                    height: auto;
+                    border-radius: 8px;
+                    opacity: 0.65;
+                }
+
+                .image-loading--preview .image-loading-overlay {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    background: var(--image-placeholder-overlay);
+                    border-radius: 8px;
+                }
+
+                .image-loading--preview .image-loading-spinner {
+                    border-color: rgba(255, 255, 255, 0.7);
+                    border-top-color: var(--link-color);
+                }
+
+                .image-loading--preview .image-loading-text {
+                    margin: 0;
+                    font-style: normal;
+                    color: var(--text-color);
+                }
+
+                @keyframes quill-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .image-error {
+                    padding: 20px;
+                    background: var(--image-error-bg);
+                    color: var(--image-error-text);
+                    border-radius: 8px;
+                    border: 1px solid var(--image-placeholder-border);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    align-items: flex-start;
+                    text-align: left;
+                }
+
+                .image-error-message {
+                    font-size: 14px;
+                    line-height: 1.4;
+                }
+
+                .image-error-detail {
+                    font-size: 12px;
+                    opacity: 0.85;
+                }
+
+                .image-error-actions {
+                    display: flex;
+                    gap: 10px;
+                }
+
+                .image-error button {
+                    padding: 6px 14px;
+                    border-radius: 6px;
+                    border: 1px solid var(--image-placeholder-border);
+                    background: transparent;
+                    color: inherit;
+                    font-size: 13px;
+                    cursor: pointer;
+                }
+
+                .image-error button:hover {
+                    background: var(--image-placeholder-bg);
                 }
                 
                 /* Remove focus outlines */
@@ -1049,9 +1167,39 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                     blockName = 'paragraph';
                             }
                             
-                            // Get appropriate HTML tag for content
-                            const tagName = this.getBlockTagName(block.type);
-                            const content = `<${tagName}>${block.content}</${tagName}>`;
+                            // Get appropriate HTML content for the block
+                            let content;
+                            if (block.type === 'image') {
+                                if (block.content && block.content.trim().length > 0) {
+                                    content = block.content;
+                                } else if (block.attributes && block.attributes.url) {
+                                    const url = this.escapeHtml(block.attributes.url);
+                                    const alt = block.attributes.alt ? this.escapeHtml(block.attributes.alt) : '';
+                                    content = `<figure class="wp-block-image"><img src="${url}" alt="${alt}" /></figure>`;
+                                } else {
+                                    content = '<figure class="wp-block-image"></figure>';
+                                }
+                            } else if (block.type === 'code') {
+                                const codeContent = block.content ? this.escapeHtml(block.content) : '';
+                                content = `<pre class="wp-block-preformatted">${codeContent}</pre>`;
+                            } else if (block.type === 'quote' || block.type === 'pullquote') {
+                                let quoteContent = block.content ? block.content.trim() : '';
+                                if (!quoteContent) {
+                                    quoteContent = block.attributes && block.attributes.text
+                                        ? `${block.attributes.text}`.trim()
+                                        : '';
+                                }
+                                if (!quoteContent.startsWith('<p')) {
+                                    quoteContent = `<p>${this.escapeHtml(quoteContent)}</p>`;
+                                }
+                                const citation = block.attributes && block.attributes.citation
+                                    ? `<cite>${this.escapeHtml(block.attributes.citation)}</cite>`
+                                    : '';
+                                content = `<blockquote class="wp-block-quote"><!-- wp:paragraph --> ${quoteContent} <!-- /wp:paragraph -->${citation}</blockquote>`;
+                            } else {
+                                const tagName = this.getBlockTagName(block.type) || 'p';
+                                content = `<${tagName}>${block.content}</${tagName}>`;
+                            }
                             
                             // Return WordPress block format with comments
                             return `<!-- wp:${blockName}${attrs} -->\n${content}\n<!-- /wp:${blockName} -->`;
@@ -1569,7 +1717,6 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             { name: 'Numbered List', type: 'ordered-list' },
                             { name: 'Code', type: 'code' },
                             { name: 'Quote', type: 'quote' },
-                            { name: 'Pullquote', type: 'pullquote' },
                             { name: 'Image', type: 'image' }
                         ];
                         
@@ -1699,6 +1846,72 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         this.focusBlock(blockIndex);
                     }
                     
+                    escapeHtml(value) {
+                        if (typeof value !== 'string') { return ''; }
+                        return value
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/"/g, '&quot;')
+                            .replace(/'/g, '&#39;');
+                    }
+
+                    renderImagePlaceholder(blockIndex, options = {}) {
+                        const block = this.blocks[blockIndex];
+                        if (!block) { return; }
+
+                        const message = this.escapeHtml(options.message || '');
+                        const previewUrl = options.previewUrl || null;
+                        const fileName = this.escapeHtml(options.fileName || '');
+                        const state = options.state || 'selecting';
+                        const detail = options.detail ? this.escapeHtml(options.detail) : '';
+
+                        let content;
+
+                        if (state === 'error') {
+                            content = `
+                                <div class="image-error">
+                                    <div class="image-error-message">${message}</div>
+                                    ${detail ? `<div class="image-error-detail">${detail}</div>` : ''}
+                                    <div class="image-error-actions">
+                                        <button type="button" class="image-error-retry" onclick="window.gutenbergEditor.retryImageUpload(${blockIndex})">Try again</button>
+                                    </div>
+                                </div>`;
+                        } else if (previewUrl) {
+                            const safePreviewUrl = this.escapeHtml(previewUrl);
+                            content = `
+                                <div class="image-loading image-loading--preview">
+                                    <img src="${safePreviewUrl}" alt="${fileName}" />
+                                    <div class="image-loading-overlay">
+                                        <div class="image-loading-spinner"></div>
+                                        <div class="image-loading-text">${message}</div>
+                                    </div>
+                                </div>`;
+                        } else {
+                            content = `
+                                <div class="image-loading">
+                                    <div class="image-loading-spinner"></div>
+                                    <div class="image-loading-text">${message}</div>
+                                </div>`;
+                        }
+
+                        block.type = 'image';
+                        block.content = content;
+                        block.attributes = {
+                            fileName,
+                            previewUrl,
+                            state,
+                            uploading: state === 'uploading',
+                            selecting: state === 'selecting',
+                            error: state === 'error'
+                        };
+                        this.render();
+                    }
+
+                    retryImageUpload(blockIndex) {
+                        this.showImagePicker(blockIndex);
+                    }
+
                     showImagePicker(blockIndex) {
                         window.webkit.messageHandlers.editorError.postMessage('showImagePicker called for block ' + blockIndex);
                         
@@ -1709,36 +1922,31 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         });
                         
                         // Update block to show placeholder while waiting
-                        this.blocks[blockIndex].type = 'image';
-                        this.blocks[blockIndex].content = '<div class="image-loading">Select an image...</div>';
-                        this.blocks[blockIndex].attributes = {
-                            selecting: true
-                        };
-                        this.render();
+                        this.renderImagePlaceholder(blockIndex, {
+                            message: 'Select an image...',
+                            state: 'selecting'
+                        });
                     }
                     
                     handleImageFile(file, blockIndex) {
-                        // First, create a placeholder image block with loading state
-                        this.blocks[blockIndex].type = 'image';
-                        this.blocks[blockIndex].content = '<div class="image-loading">Uploading image...</div>';
-                        this.blocks[blockIndex].attributes = {
-                            uploading: true
-                        };
-                        this.render();
+                        // First, show a loading state while we prepare the file
+                        this.renderImagePlaceholder(blockIndex, {
+                            message: 'Preparing image...',
+                            state: 'uploading'
+                        });
                         
                         // Read the file as data URL for immediate preview
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             const dataUrl = e.target.result;
                             
-                            // Update block with preview
-                            this.blocks[blockIndex].content = `<img src="${dataUrl}" alt="${file.name}" style="max-width: 100%; height: auto;" />`;
-                            this.blocks[blockIndex].attributes = {
-                                dataUrl: dataUrl,
-                                fileName: file.name,
-                                uploading: true
-                            };
-                            this.render();
+                            // Update block with preview and spinner
+                            this.renderImagePlaceholder(blockIndex, {
+                                message: 'Uploading image...',
+                                state: 'uploading',
+                                previewUrl: dataUrl,
+                                fileName: file.name
+                            });
                             
                             // Notify native app to handle the actual upload
                             window.webkit.messageHandlers.imageUpload.postMessage({
@@ -2360,7 +2568,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                     break;
                                 case 'image':
                                     blockName = 'image';
-                                    if (block.attributes.id) {
+                                    if (block.attributes && block.attributes.id) {
                                         attrs = ` {"id":${block.attributes.id}}`;
                                     }
                                     break;
@@ -2368,17 +2576,38 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                     blockName = 'paragraph';
                             }
                             
-                            // Get the proper HTML tag for the block
-                            const tagName = this.getBlockTagName(block.type);
-                            let content = '';
-                            
                             // Format content based on block type
-                            if (block.type === 'image' && block.attributes.url) {
-                                content = `<figure class="wp-block-image"><img src="${block.attributes.url}" alt="${block.attributes.alt || ''}" /></figure>`;
-                            } else if (tagName) {
-                                content = `<${tagName}>${block.content}</${tagName}>`;
+                            let content;
+                            if (block.type === 'image') {
+                                if (block.content && block.content.trim().length > 0) {
+                                    content = block.content;
+                                } else if (block.attributes && block.attributes.url) {
+                                    const url = this.escapeHtml(block.attributes.url);
+                                    const alt = block.attributes.alt ? this.escapeHtml(block.attributes.alt) : '';
+                                    content = `<figure class="wp-block-image"><img src="${url}" alt="${alt}" /></figure>`;
+                                } else {
+                                    content = '<figure class="wp-block-image"></figure>';
+                                }
+                            } else if (block.type === 'code') {
+                                const codeContent = block.content ? this.escapeHtml(block.content) : '';
+                                content = `<pre class="wp-block-preformatted">${codeContent}</pre>`;
+                            } else if (block.type === 'quote' || block.type === 'pullquote') {
+                                let quoteContent = block.content ? block.content.trim() : '';
+                                if (!quoteContent) {
+                                    quoteContent = block.attributes && block.attributes.text
+                                        ? `${block.attributes.text}`.trim()
+                                        : '';
+                                }
+                                if (!quoteContent.startsWith('<p')) {
+                                    quoteContent = `<p>${this.escapeHtml(quoteContent)}</p>`;
+                                }
+                                const citation = block.attributes && block.attributes.citation
+                                    ? `<cite>${this.escapeHtml(block.attributes.citation)}</cite>`
+                                    : '';
+                                content = `<blockquote class="wp-block-quote"><!-- wp:paragraph --> ${quoteContent} <!-- /wp:paragraph -->${citation}</blockquote>`;
                             } else {
-                                content = block.content;
+                                const tagName = this.getBlockTagName(block.type) || 'p';
+                                content = `<${tagName}>${block.content}</${tagName}>`;
                             }
                             
                             // Wrap with WordPress block comments
@@ -2686,6 +2915,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     if let imageData = try? Data(contentsOf: url) {
                         let mimeType = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
                         let fileName = url.lastPathComponent
+                        let escapedFileName = fileName
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "'", with: "\\'")
+                            .replacingOccurrences(of: "\n", with: " ")
+                        let escapedFileName = fileName
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "'", with: "\\'")
+                            .replacingOccurrences(of: "\n", with: " ")
+                        let escapedFileName = fileName
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "'", with: "\\'")
+                            .replacingOccurrences(of: "\n", with: " ")
                         
                         // First, show a preview with data URL while uploading
                         let base64String = imageData.base64EncodedString()
@@ -2696,13 +2937,12 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
                             let previewScript = """
                                 if (window.gutenbergEditor) {
-                                    window.gutenbergEditor.blocks[\(blockIndex)].type = 'image';
-                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-loading" style="position: relative;"><img src="\(escapedUrl)" alt="\(fileName)" style="max-width: 100%; height: auto; opacity: 0.5;" /><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.9); padding: 10px; border-radius: 4px;">Uploading to WordPress...</div></div>';
-                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
-                                        uploading: true,
-                                        fileName: '\(fileName)'
-                                    };
-                                    window.gutenbergEditor.render();
+                                    window.gutenbergEditor.renderImagePlaceholder(\(blockIndex), {
+                                        message: 'Uploading to WordPress...',
+                                        state: 'uploading',
+                                        previewUrl: '\(escapedUrl)',
+                                        fileName: '\(escapedFileName)'
+                                    });
                                 }
                             """
                             webView.evaluateJavaScript(previewScript) { _, _ in }
@@ -2763,14 +3003,18 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                     // Show error state
                                     await MainActor.run {
                                         if let webView = self.parent.webViewRef {
+                                            let errorDetail = error.localizedDescription.isEmpty ? "Unknown error" : error.localizedDescription
+                                            let escapedErrorDetail = errorDetail
+                                                .replacingOccurrences(of: "\\", with: "\\\\")
+                                                .replacingOccurrences(of: "'", with: "\\'")
+                                                .replacingOccurrences(of: "\n", with: " ")
                                             let errorScript = """
                                                 if (window.gutenbergEditor) {
-                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: var(--image-error-bg); color: var(--image-error-text); border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
-                                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
-                                                        error: true,
-                                                        uploading: false
-                                                    };
-                                                    window.gutenbergEditor.render();
+                                                    window.gutenbergEditor.renderImagePlaceholder(\(blockIndex), {
+                                                        message: 'Failed to upload image',
+                                                        state: 'error',
+                                                        detail: '\(escapedErrorDetail)'
+                                                    });
                                                 }
                                             """
                                             webView.evaluateJavaScript(errorScript) { _, _ in }
@@ -3252,6 +3496,9 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     --slash-menu-text: #000;
                     --image-error-bg: #ffebee;
                     --image-error-text: #c62828;
+                    --image-placeholder-bg: rgba(0, 0, 0, 0.04);
+                    --image-placeholder-border: rgba(0, 0, 0, 0.08);
+                    --image-placeholder-text: rgba(60, 60, 67, 0.6);
                 }
                 
                 @media (prefers-color-scheme: dark) {
@@ -3278,6 +3525,9 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         --slash-menu-text: #ffffff;
                         --image-error-bg: #5c2828;
                         --image-error-text: #ff9999;
+                        --image-placeholder-bg: rgba(255, 255, 255, 0.08);
+                        --image-placeholder-border: rgba(255, 255, 255, 0.16);
+                        --image-placeholder-text: rgba(235, 235, 245, 0.7);
                     }
                 }
                 
@@ -3417,13 +3667,121 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 
                 .image-loading {
                     position: relative;
-                    padding: 40px;
+                    padding: 24px;
                     text-align: center;
-                    color: #666;
-                    background: #f5f5f5;
-                    border-radius: 4px;
+                    color: var(--image-placeholder-text);
+                    background: var(--image-placeholder-bg);
+                    border-radius: 8px;
+                    border: 1px dashed var(--image-placeholder-border);
+                    min-height: 140px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    font-style: normal;
+                }
+
+                .image-loading .image-loading-spinner {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    border: 3px solid var(--image-placeholder-border);
+                    border-top-color: var(--link-color);
+                    animation: quill-spin 1s linear infinite;
+                }
+
+                .image-loading .image-loading-text {
+                    font-size: 14px;
                     font-style: italic;
-                    min-height: 200px;
+                }
+
+                .image-loading--preview {
+                    position: relative;
+                    padding: 0;
+                    background: var(--image-placeholder-bg);
+                    border: 1px solid var(--image-placeholder-border);
+                    min-height: 0;
+                    display: block;
+                    overflow: hidden;
+                }
+
+                .image-loading--preview img {
+                    display: block;
+                    width: 100%;
+                    height: auto;
+                    border-radius: 8px;
+                    opacity: 0.65;
+                }
+
+                .image-loading--preview .image-loading-overlay {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    background: var(--image-placeholder-overlay);
+                    border-radius: 8px;
+                }
+
+                .image-loading--preview .image-loading-spinner {
+                    border-color: rgba(255, 255, 255, 0.7);
+                    border-top-color: var(--link-color);
+                }
+
+                .image-loading--preview .image-loading-text {
+                    margin: 0;
+                    font-style: normal;
+                    color: var(--text-color);
+                }
+
+                @keyframes quill-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .image-error {
+                    padding: 20px;
+                    background: var(--image-error-bg);
+                    color: var(--image-error-text);
+                    border-radius: 8px;
+                    border: 1px solid var(--image-placeholder-border);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    align-items: flex-start;
+                    text-align: left;
+                }
+
+                .image-error-message {
+                    font-size: 14px;
+                    line-height: 1.4;
+                }
+
+                .image-error-detail {
+                    font-size: 12px;
+                    opacity: 0.85;
+                }
+
+                .image-error-actions {
+                    display: flex;
+                    gap: 10px;
+                }
+
+                .image-error button {
+                    padding: 6px 14px;
+                    border-radius: 6px;
+                    border: 1px solid var(--image-placeholder-border);
+                    background: transparent;
+                    color: inherit;
+                    font-size: 13px;
+                    cursor: pointer;
+                }
+
+                .image-error button:hover {
+                    background: var(--image-placeholder-bg);
                 }
                 
                 /* Remove focus outlines */
@@ -4016,9 +4374,39 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                     blockName = 'paragraph';
                             }
                             
-                            // Get appropriate HTML tag for content
-                            const tagName = this.getBlockTagName(block.type);
-                            const content = `<${tagName}>${block.content}</${tagName}>`;
+                            // Get appropriate HTML content for the block
+                            let content;
+                            if (block.type === 'image') {
+                                if (block.content && block.content.trim().length > 0) {
+                                    content = block.content;
+                                } else if (block.attributes && block.attributes.url) {
+                                    const url = this.escapeHtml(block.attributes.url);
+                                    const alt = block.attributes.alt ? this.escapeHtml(block.attributes.alt) : '';
+                                    content = `<figure class="wp-block-image"><img src="${url}" alt="${alt}" /></figure>`;
+                                } else {
+                                    content = '<figure class="wp-block-image"></figure>';
+                                }
+                            } else if (block.type === 'code') {
+                                const codeContent = block.content ? this.escapeHtml(block.content) : '';
+                                content = `<pre class="wp-block-preformatted">${codeContent}</pre>`;
+                            } else if (block.type === 'quote' || block.type === 'pullquote') {
+                                let quoteContent = block.content ? block.content.trim() : '';
+                                if (!quoteContent) {
+                                    quoteContent = block.attributes && block.attributes.text
+                                        ? `${block.attributes.text}`.trim()
+                                        : '';
+                                }
+                                if (!quoteContent.startsWith('<p')) {
+                                    quoteContent = `<p>${this.escapeHtml(quoteContent)}</p>`;
+                                }
+                                const citation = block.attributes && block.attributes.citation
+                                    ? `<cite>${this.escapeHtml(block.attributes.citation)}</cite>`
+                                    : '';
+                                content = `<blockquote class="wp-block-quote"><!-- wp:paragraph --> ${quoteContent} <!-- /wp:paragraph -->${citation}</blockquote>`;
+                            } else {
+                                const tagName = this.getBlockTagName(block.type) || 'p';
+                                content = `<${tagName}>${block.content}</${tagName}>`;
+                            }
                             
                             // Return WordPress block format with comments
                             return `<!-- wp:${blockName}${attrs} -->\\n${content}\\n<!-- /wp:${blockName} -->`;
@@ -4537,7 +4925,6 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             { name: 'Numbered List', type: 'ordered-list' },
                             { name: 'Code', type: 'code' },
                             { name: 'Quote', type: 'quote' },
-                            { name: 'Pullquote', type: 'pullquote' },
                             { name: 'Image', type: 'image' }
                         ];
                         
@@ -4667,6 +5054,72 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         this.focusBlock(blockIndex);
                     }
                     
+                    escapeHtml(value) {
+                        if (typeof value !== 'string') { return ''; }
+                        return value
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/"/g, '&quot;')
+                            .replace(/'/g, '&#39;');
+                    }
+
+                    renderImagePlaceholder(blockIndex, options = {}) {
+                        const block = this.blocks[blockIndex];
+                        if (!block) { return; }
+
+                        const message = this.escapeHtml(options.message || '');
+                        const previewUrl = options.previewUrl || null;
+                        const fileName = this.escapeHtml(options.fileName || '');
+                        const state = options.state || 'selecting';
+                        const detail = options.detail ? this.escapeHtml(options.detail) : '';
+
+                        let content;
+
+                        if (state === 'error') {
+                            content = `
+                                <div class="image-error">
+                                    <div class="image-error-message">${message}</div>
+                                    ${detail ? `<div class="image-error-detail">${detail}</div>` : ''}
+                                    <div class="image-error-actions">
+                                        <button type="button" class="image-error-retry" onclick="window.gutenbergEditor.retryImageUpload(${blockIndex})">Try again</button>
+                                    </div>
+                                </div>`;
+                        } else if (previewUrl) {
+                            const safePreviewUrl = this.escapeHtml(previewUrl);
+                            content = `
+                                <div class="image-loading image-loading--preview">
+                                    <img src="${safePreviewUrl}" alt="${fileName}" />
+                                    <div class="image-loading-overlay">
+                                        <div class="image-loading-spinner"></div>
+                                        <div class="image-loading-text">${message}</div>
+                                    </div>
+                                </div>`;
+                        } else {
+                            content = `
+                                <div class="image-loading">
+                                    <div class="image-loading-spinner"></div>
+                                    <div class="image-loading-text">${message}</div>
+                                </div>`;
+                        }
+
+                        block.type = 'image';
+                        block.content = content;
+                        block.attributes = {
+                            fileName,
+                            previewUrl,
+                            state,
+                            uploading: state === 'uploading',
+                            selecting: state === 'selecting',
+                            error: state === 'error'
+                        };
+                        this.render();
+                    }
+
+                    retryImageUpload(blockIndex) {
+                        this.showImagePicker(blockIndex);
+                    }
+
                     showImagePicker(blockIndex) {
                         window.webkit.messageHandlers.editorError.postMessage('showImagePicker called for block ' + blockIndex);
                         
@@ -4677,36 +5130,31 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         });
                         
                         // Update block to show placeholder while waiting
-                        this.blocks[blockIndex].type = 'image';
-                        this.blocks[blockIndex].content = '<div class="image-loading">Select an image...</div>';
-                        this.blocks[blockIndex].attributes = {
-                            selecting: true
-                        };
-                        this.render();
+                        this.renderImagePlaceholder(blockIndex, {
+                            message: 'Select an image...',
+                            state: 'selecting'
+                        });
                     }
                     
                     handleImageFile(file, blockIndex) {
-                        // First, create a placeholder image block with loading state
-                        this.blocks[blockIndex].type = 'image';
-                        this.blocks[blockIndex].content = '<div class="image-loading">Uploading image...</div>';
-                        this.blocks[blockIndex].attributes = {
-                            uploading: true
-                        };
-                        this.render();
+                        // First, show a loading state while we prepare the file
+                        this.renderImagePlaceholder(blockIndex, {
+                            message: 'Preparing image...',
+                            state: 'uploading'
+                        });
                         
                         // Read the file as data URL for immediate preview
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             const dataUrl = e.target.result;
                             
-                            // Update block with preview
-                            this.blocks[blockIndex].content = `<img src="${dataUrl}" alt="${file.name}" style="max-width: 100%; height: auto;" />`;
-                            this.blocks[blockIndex].attributes = {
-                                dataUrl: dataUrl,
-                                fileName: file.name,
-                                uploading: true
-                            };
-                            this.render();
+                            // Update block with preview and spinner
+                            this.renderImagePlaceholder(blockIndex, {
+                                message: 'Uploading image...',
+                                state: 'uploading',
+                                previewUrl: dataUrl,
+                                fileName: file.name
+                            });
                             
                             // Notify native app to handle the actual upload
                             window.webkit.messageHandlers.imageUpload.postMessage({
@@ -5346,6 +5794,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     if let imageData = try? Data(contentsOf: url) {
                         let mimeType = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
                         let fileName = url.lastPathComponent
+                        let escapedFileName = fileName
+                            .replacingOccurrences(of: "\\", with: "\\\\")
+                            .replacingOccurrences(of: "'", with: "\\'")
+                            .replacingOccurrences(of: "\n", with: " ")
                         
                         // First, show a preview with data URL while uploading
                         let base64String = imageData.base64EncodedString()
@@ -5356,13 +5808,12 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             let escapedUrl = dataUrl.replacingOccurrences(of: "'", with: "\\'")
                             let previewScript = """
                                 if (window.gutenbergEditor) {
-                                    window.gutenbergEditor.blocks[\(blockIndex)].type = 'image';
-                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-loading" style="position: relative;"><img src="\(escapedUrl)" alt="\(fileName)" style="max-width: 100%; height: auto; opacity: 0.5;" /><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.9); padding: 10px; border-radius: 4px;">Uploading to WordPress...</div></div>';
-                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
-                                        uploading: true,
-                                        fileName: '\(fileName)'
-                                    };
-                                    window.gutenbergEditor.render();
+                                    window.gutenbergEditor.renderImagePlaceholder(\(blockIndex), {
+                                        message: 'Uploading to WordPress...',
+                                        state: 'uploading',
+                                        previewUrl: '\(escapedUrl)',
+                                        fileName: '\(escapedFileName)'
+                                    });
                                 }
                             """
                             webView.evaluateJavaScript(previewScript) { _, _ in }
@@ -5423,14 +5874,18 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                     // Show error state
                                     await MainActor.run {
                                         if let webView = self.parent.webViewRef {
+                                            let errorDetail = error.localizedDescription.isEmpty ? "Unknown error" : error.localizedDescription
+                                            let escapedErrorDetail = errorDetail
+                                                .replacingOccurrences(of: "\\", with: "\\\\")
+                                                .replacingOccurrences(of: "'", with: "\\'")
+                                                .replacingOccurrences(of: "\n", with: " ")
                                             let errorScript = """
                                                 if (window.gutenbergEditor) {
-                                                    window.gutenbergEditor.blocks[\(blockIndex)].content = '<div class="image-error" style="padding: 20px; background: var(--image-error-bg); color: var(--image-error-text); border-radius: 4px;">Failed to upload image: \(error.localizedDescription)</div>';
-                                                    window.gutenbergEditor.blocks[\(blockIndex)].attributes = {
-                                                        error: true,
-                                                        uploading: false
-                                                    };
-                                                    window.gutenbergEditor.render();
+                                                    window.gutenbergEditor.renderImagePlaceholder(\(blockIndex), {
+                                                        message: 'Failed to upload image',
+                                                        state: 'error',
+                                                        detail: '\(escapedErrorDetail)'
+                                                    });
                                                 }
                                             """
                                             webView.evaluateJavaScript(errorScript) { _, _ in }
