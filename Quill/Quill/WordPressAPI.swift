@@ -6,17 +6,23 @@
 //
 
 import Foundation
+import Darwin
 
 class WordPressAPI {
     static let shared = WordPressAPI()
     private init() {}
     
     private var session: URLSession = {
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.httpCookieStorage = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: config)
     }()
-    
+
     // MARK: - Authentication
     
     func testConnection(siteURL: String, username: String, password: String) async throws -> Bool {
@@ -352,63 +358,404 @@ class WordPressAPI {
         }
     }
     
-    func fetchPosts(siteURL: String, username: String, password: String, page: Int = 1, perPage: Int = 100) async throws -> [WordPressPost] {
+    func fetchPosts(siteURL: String, username: String, password: String, page: Int = 1, perPage initialPerPage: Int = 50) async throws -> [WordPressPost] {
         let baseURL = normalizeURL(siteURL)
-        let endpoint = "\(baseURL)/wp-json/wp/v2/posts"
-        
-        guard var components = URLComponents(string: endpoint) else {
+
+        do {
+            return try await fetchPostsPaged(
+                baseURL: baseURL,
+                username: username,
+                password: password,
+                startPage: page,
+                initialPerPage: initialPerPage
+            )
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSPOSIXErrorDomain && nsError.code == POSIXErrorCode.EMSGSIZE.rawValue {
+                DebugLogger.shared.log("Paged post fetch exceeded message size, retrying with individual post requests.", level: .warning, source: "WordPressAPI")
+                return try await fetchPostsIndividually(
+                    baseURL: baseURL,
+                    username: username,
+                    password: password,
+                    startPage: page,
+                    initialPerPage: initialPerPage
+                )
+            }
+            throw error
+        }
+    }
+
+    private func fetchPostsPaged(
+        baseURL: String,
+        username: String,
+        password: String,
+        startPage: Int,
+        initialPerPage: Int
+    ) async throws -> [WordPressPost] {
+        var allPosts: [WordPressPost] = []
+        var currentPage = startPage
+        var currentPerPage = initialPerPage
+        var totalPages: Int?
+
+        DebugLogger.shared.log("Preparing to fetch WordPress posts with initial per_page=\(initialPerPage)", level: .debug, source: "WordPressAPI")
+
+        while totalPages == nil || currentPage <= (totalPages ?? 0) {
+            let pageResult = try await fetchPostsPage(
+                baseURL: baseURL,
+                username: username,
+                password: password,
+                page: currentPage,
+                perPage: currentPerPage
+            )
+
+            allPosts.append(contentsOf: pageResult.posts)
+            currentPerPage = pageResult.perPageUsed
+
+            if let pageCount = pageResult.totalPages {
+                totalPages = pageCount
+            }
+
+            DebugLogger.shared.log(
+                "Fetched page \(currentPage) with per_page=\(pageResult.perPageUsed); retrieved \(pageResult.posts.count) posts",
+                level: .debug,
+                source: "WordPressAPI"
+            )
+
+            if pageResult.posts.count < pageResult.perPageUsed {
+                break
+            }
+
+            currentPage += 1
+        }
+
+        DebugLogger.shared.log("Completed WordPress fetch. Total posts retrieved: \(allPosts.count)", level: .info, source: "WordPressAPI")
+        return allPosts
+    }
+
+    private func fetchPostsPage(
+        baseURL: String,
+        username: String,
+        password: String,
+        page: Int,
+        perPage: Int
+    ) async throws -> (posts: [WordPressPost], totalPages: Int?, perPageUsed: Int) {
+        var attemptPerPage = perPage
+        var lastError: Error?
+
+        while attemptPerPage >= 1 {
+            guard var components = URLComponents(string: "\(baseURL)/wp-json/wp/v2/posts") else {
+                throw WordPressError.invalidURL
+            }
+
+            components.queryItems = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "per_page", value: String(attemptPerPage)),
+                URLQueryItem(name: "status", value: "any"),
+                URLQueryItem(name: "orderby", value: "date"),
+                URLQueryItem(name: "order", value: "desc"),
+                URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,slug,status,title,content,excerpt")
+            ]
+
+            guard let url = components.url else {
+                throw WordPressError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("clear", forHTTPHeaderField: "Alt-Svc")
+
+            let credentials = "\(username):\(password)"
+            if let credentialData = credentials.data(using: .utf8) {
+                let base64Credentials = credentialData.base64EncodedString()
+                request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+                DebugLogger.shared.log("Authorization header length: \(base64Credentials.count) characters", level: .debug, source: "WordPressAPI")
+            } else {
+                DebugLogger.shared.log("Failed to encode credentials as UTF-8", level: .error, source: "WordPressAPI")
+            }
+
+            DebugLogger.shared.log("Requesting posts page \(page) with per_page=\(attemptPerPage)", level: .debug, source: "WordPressAPI")
+
+            do {
+                let (data, response) = try await session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw WordPressError.invalidResponse
+                }
+
+                if httpResponse.statusCode == 200 {
+                    do {
+                        let decoder = JSONDecoder()
+                        let posts = try decoder.decode([WordPressPost].self, from: data)
+                        let totalPagesHeader = httpResponse.value(forHTTPHeaderField: "X-WP-TotalPages")
+                        let totalPages = totalPagesHeader.flatMap { Int($0) }
+                        return (posts, totalPages, attemptPerPage)
+                    } catch {
+                        if let responseString = String(data: data, encoding: .utf8) {
+                            print("Raw response: \(responseString)")
+                        }
+                        print("Decoding error: \(error)")
+                        throw WordPressError.decodingError
+                    }
+                } else if httpResponse.statusCode == 401 {
+                    throw WordPressError.unauthorized
+                } else {
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        DebugLogger.shared.log("Fetch posts error response: \(responseString)", level: .error, source: "WordPressAPI")
+                    }
+                    throw WordPressError.httpError(statusCode: httpResponse.statusCode)
+                }
+            } catch {
+                let nsError = error as NSError
+                if nsError.domain == NSPOSIXErrorDomain && nsError.code == POSIXErrorCode.EMSGSIZE.rawValue && attemptPerPage > 1 {
+                    let newPerPage = max(1, attemptPerPage / 2)
+                    DebugLogger.shared.log(
+                        "Received EMSGSIZE when fetching page \(page). Reducing per_page from \(attemptPerPage) to \(newPerPage) and retrying.",
+                        level: .warning,
+                        source: "WordPressAPI"
+                    )
+                    attemptPerPage = newPerPage
+                    lastError = error
+                    continue
+                } else {
+                    throw error
+                }
+            }
+        }
+
+        if let error = lastError {
+            throw error
+        }
+
+        throw WordPressError.invalidResponse
+    }
+
+    private func fetchPostsIndividually(
+        baseURL: String,
+        username: String,
+        password: String,
+        startPage: Int,
+        initialPerPage: Int
+    ) async throws -> [WordPressPost] {
+        DebugLogger.shared.log("Falling back to individual post fetch", level: .warning, source: "WordPressAPI")
+
+        let postIDs = try await fetchPostIDs(
+            baseURL: baseURL,
+            username: username,
+            password: password,
+            startPage: startPage,
+            initialPerPage: initialPerPage
+        )
+
+        DebugLogger.shared.log("Fetching \(postIDs.count) posts individually", level: .info, source: "WordPressAPI")
+
+        var posts: [WordPressPost] = []
+        posts.reserveCapacity(postIDs.count)
+
+        for (index, postID) in postIDs.enumerated() {
+            do {
+                let post = try await fetchSinglePost(
+                    baseURL: baseURL,
+                    username: username,
+                    password: password,
+                    postID: postID
+                )
+                posts.append(post)
+
+                if (index + 1) % 5 == 0 || index == postIDs.count - 1 {
+                    DebugLogger.shared.log("Fetched \(index + 1)/\(postIDs.count) posts individually", level: .debug, source: "WordPressAPI")
+                }
+            } catch {
+                let nsError = error as NSError
+                if nsError.domain == NSPOSIXErrorDomain && nsError.code == POSIXErrorCode.EMSGSIZE.rawValue {
+                    DebugLogger.shared.log("Failed to fetch post \(postID) individually due to EMSGSIZE", level: .error, source: "WordPressAPI")
+                }
+                throw error
+            }
+        }
+
+        return posts
+    }
+
+    private func fetchPostIDs(
+        baseURL: String,
+        username: String,
+        password: String,
+        startPage: Int,
+        initialPerPage: Int
+    ) async throws -> [Int] {
+        var allIDs: [Int] = []
+        var currentPage = startPage
+        var currentPerPage = initialPerPage
+        var totalPages: Int?
+
+        while totalPages == nil || currentPage <= (totalPages ?? 0) {
+            let pageResult = try await fetchPostIDsPage(
+                baseURL: baseURL,
+                username: username,
+                password: password,
+                page: currentPage,
+                perPage: currentPerPage
+            )
+
+            allIDs.append(contentsOf: pageResult.ids)
+            currentPerPage = pageResult.perPageUsed
+
+            if let pageCount = pageResult.totalPages {
+                totalPages = pageCount
+            }
+
+            DebugLogger.shared.log(
+                "Fetched ID page \(currentPage) with per_page=\(pageResult.perPageUsed); retrieved \(pageResult.ids.count) IDs",
+                level: .debug,
+                source: "WordPressAPI"
+            )
+
+            if pageResult.ids.count < pageResult.perPageUsed {
+                break
+            }
+
+            currentPage += 1
+        }
+
+        return allIDs
+    }
+
+    private func fetchPostIDsPage(
+        baseURL: String,
+        username: String,
+        password: String,
+        page: Int,
+        perPage: Int
+    ) async throws -> (ids: [Int], totalPages: Int?, perPageUsed: Int) {
+        var attemptPerPage = perPage
+        var lastError: Error?
+
+        while attemptPerPage >= 1 {
+            guard var components = URLComponents(string: "\(baseURL)/wp-json/wp/v2/posts") else {
+                throw WordPressError.invalidURL
+            }
+
+            components.queryItems = [
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "per_page", value: String(attemptPerPage)),
+                URLQueryItem(name: "status", value: "any"),
+                URLQueryItem(name: "orderby", value: "date"),
+                URLQueryItem(name: "order", value: "desc"),
+                URLQueryItem(name: "_fields", value: "id")
+            ]
+
+            guard let url = components.url else {
+                throw WordPressError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+
+            let credentials = "\(username):\(password)"
+            if let credentialData = credentials.data(using: .utf8) {
+                let base64Credentials = credentialData.base64EncodedString()
+                request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+                DebugLogger.shared.log("Authorization header length (ID fetch): \(base64Credentials.count) characters", level: .debug, source: "WordPressAPI")
+            }
+
+            DebugLogger.shared.log("Requesting post ID page \(page) with per_page=\(attemptPerPage)", level: .debug, source: "WordPressAPI")
+
+            do {
+                let (data, response) = try await session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw WordPressError.invalidResponse
+                }
+
+                if httpResponse.statusCode == 200 {
+                    let decoder = JSONDecoder()
+                    let summaries = try decoder.decode([WordPressPostIDSummary].self, from: data)
+                    let totalPagesHeader = httpResponse.value(forHTTPHeaderField: "X-WP-TotalPages")
+                    let totalPages = totalPagesHeader.flatMap { Int($0) }
+                    let ids = summaries.map { $0.id }
+                    return (ids, totalPages, attemptPerPage)
+                } else if httpResponse.statusCode == 401 {
+                    throw WordPressError.unauthorized
+                } else {
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        DebugLogger.shared.log("Post ID fetch error response: \(responseString)", level: .error, source: "WordPressAPI")
+                    }
+                    throw WordPressError.httpError(statusCode: httpResponse.statusCode)
+                }
+            } catch {
+                let nsError = error as NSError
+                if nsError.domain == NSPOSIXErrorDomain && nsError.code == POSIXErrorCode.EMSGSIZE.rawValue && attemptPerPage > 1 {
+                    let newPerPage = max(1, attemptPerPage / 2)
+                    DebugLogger.shared.log(
+                        "Received EMSGSIZE when fetching ID page \(page). Reducing per_page from \(attemptPerPage) to \(newPerPage) and retrying.",
+                        level: .warning,
+                        source: "WordPressAPI"
+                    )
+                    attemptPerPage = newPerPage
+                    lastError = error
+                    continue
+                } else {
+                    throw error
+                }
+            }
+        }
+
+        if let error = lastError {
+            throw error
+        }
+
+        throw WordPressError.invalidResponse
+    }
+
+    private func fetchSinglePost(
+        baseURL: String,
+        username: String,
+        password: String,
+        postID: Int
+    ) async throws -> WordPressPost {
+        guard var components = URLComponents(string: "\(baseURL)/wp-json/wp/v2/posts/\(postID)") else {
             throw WordPressError.invalidURL
         }
-        
+
         components.queryItems = [
-            URLQueryItem(name: "page", value: String(page)),
-            URLQueryItem(name: "per_page", value: String(perPage)),
-            URLQueryItem(name: "status", value: "any"),
-            URLQueryItem(name: "orderby", value: "date"),
-            URLQueryItem(name: "order", value: "desc"),
             URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,slug,status,title,content,excerpt")
         ]
-        
+
         guard let url = components.url else {
             throw WordPressError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
-        // Add Basic Auth header
+
         let credentials = "\(username):\(password)"
         if let credentialData = credentials.data(using: .utf8) {
             let base64Credentials = credentialData.base64EncodedString()
             request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+            DebugLogger.shared.log("Authorization header length (single post): \(base64Credentials.count) characters", level: .debug, source: "WordPressAPI")
         }
-        
+
+        DebugLogger.shared.log("Requesting individual post \(postID)", level: .debug, source: "WordPressAPI")
+
         let (data, response) = try await session.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw WordPressError.invalidResponse
         }
-        
+
         if httpResponse.statusCode == 200 {
-            do {
-                let decoder = JSONDecoder()
-                let posts = try decoder.decode([WordPressPost].self, from: data)
-                return posts
-            } catch {
-                // Print the raw response for debugging
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("Raw response: \(responseString)")
-                }
-                print("Decoding error: \(error)")
-                throw WordPressError.decodingError
-            }
+            let decoder = JSONDecoder()
+            return try decoder.decode(WordPressPost.self, from: data)
         } else if httpResponse.statusCode == 401 {
             throw WordPressError.unauthorized
         } else {
+            if let responseString = String(data: data, encoding: .utf8) {
+                DebugLogger.shared.log("Single post fetch error response: \(responseString)", level: .error, source: "WordPressAPI")
+            }
             throw WordPressError.httpError(statusCode: httpResponse.statusCode)
         }
     }
-    
+
     // MARK: - Helpers
     
     private func normalizeURL(_ url: String) -> String {
@@ -438,6 +785,11 @@ struct WordPressPostRequest: Codable {
     let slug: String?
     let excerpt: String?
     let date: String?
+}
+
+
+struct WordPressPostIDSummary: Codable {
+    let id: Int
 }
 
 struct WordPressPost: Codable {

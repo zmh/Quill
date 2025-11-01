@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Darwin
 import SwiftData
 
 class SyncManager: ObservableObject {
@@ -105,6 +106,7 @@ class SyncManager: ObservableObject {
                 throw SyncError.noPasswordFound
             }
             
+            DebugLogger.shared.log("Retrieved password length: \(password.count) characters", level: .debug, source: "SyncManager")
             DebugLogger.shared.log("Fetching posts from WordPress API...", level: .info, source: "SyncManager")
             let startTime = Date()
             
@@ -157,8 +159,14 @@ class SyncManager: ObservableObject {
             isSyncing = false
             
         } catch {
-            DebugLogger.shared.log("WordPress sync failed: \(error.localizedDescription)", level: .error, source: "SyncManager")
-            lastError = error
+            let nsError = error as NSError
+            DebugLogger.shared.log("WordPress sync failed: \(error.localizedDescription) (domain: \(nsError.domain), code: \(nsError.code))", level: .error, source: "SyncManager")
+            if nsError.domain == NSPOSIXErrorDomain && nsError.code == POSIXErrorCode.EMSGSIZE.rawValue {
+                DebugLogger.shared.log("Received message-too-long error while syncing. Retrying with smaller fetch size may be necessary.", level: .warning, source: "SyncManager")
+                lastError = SyncError.http3MessageTooLong
+            } else {
+                lastError = error
+            }
             isSyncing = false
         }
     }
@@ -272,6 +280,7 @@ class SyncManager: ObservableObject {
 enum SyncError: LocalizedError {
     case noSiteConfigured
     case noPasswordFound
+    case http3MessageTooLong
     
     var errorDescription: String? {
         switch self {
@@ -279,6 +288,11 @@ enum SyncError: LocalizedError {
             return "No WordPress site configured"
         case .noPasswordFound:
             return "No password found in Keychain"
+        case .http3MessageTooLong:
+            return """
+            WordPress returned a response that was too large to deliver over HTTP/3/QUIC. \
+            Disable HTTP/3 (with QUIC) in Cloudflare by opening Speed ▸ Settings and turning off “HTTP/3 (with QUIC)”, then try syncing again.
+            """
         }
     }
 }
