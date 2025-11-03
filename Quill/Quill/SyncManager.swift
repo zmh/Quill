@@ -122,8 +122,14 @@ class SyncManager: ObservableObject {
             
             // Update local posts (all SwiftData operations on MainActor)
             for wpPost in wpPosts {
+                let enrichedPost = await self.postWithLatestAutosaveIfNeeded(
+                    wpPost,
+                    siteURL: siteURL,
+                    username: username,
+                    password: password
+                )
                 // Check if post already exists
-                let wpPostID = wpPost.id
+                let wpPostID = enrichedPost.id
                 let postDescriptor = FetchDescriptor<Post>(
                     predicate: #Predicate { post in
                         post.remoteID == wpPostID
@@ -135,10 +141,10 @@ class SyncManager: ObservableObject {
                     
                     if let existingPost = existingPosts.first {
                         // Update existing post
-                        updatePost(existingPost, from: wpPost)
+                        updatePost(existingPost, from: enrichedPost)
                     } else {
                         // Create new post
-                        let newPost = createPost(from: wpPost)
+                        let newPost = createPost(from: enrichedPost)
                         modelContext.insert(newPost)
                     }
                 } catch {
@@ -174,25 +180,32 @@ class SyncManager: ObservableObject {
     private func updatePost(_ post: Post, from wpPost: WordPressPost) {
         post.title = cleanHTML(wpPost.title.rendered)
         
-        // Log the original content to see what entities we're dealing with
-        let originalContent = wpPost.content.rendered
-        let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(originalContent)
+        // Prefer raw block content when available so we keep Gutenberg structure intact
+        let rawContent = wpPost.content.raw
+        let renderedContent = wpPost.content.rendered
+        let contentToStore: String
         
-        // Check if content contains HTML entities
-        let hasHTMLEntities = originalContent.contains("&#") || originalContent.contains("&amp;") || originalContent.contains("&lt;") || originalContent.contains("&gt;") || originalContent.contains("&quot;")
-        
-        // Log for any post with HTML entities, not just those with "Formats" in title
-        if hasHTMLEntities {
-            DebugLogger.shared.log("=== HTML Entity Decoding Debug ===", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Post title: \(wpPost.title.rendered)", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Original content: \(String(originalContent.prefix(200)))", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Decoded content: \(String(decodedContent.prefix(200)))", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Content changed: \(originalContent != decodedContent)", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Original length: \(originalContent.count), Decoded length: \(decodedContent.count)", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("=== End Debug ===", level: .debug, source: "SyncManager")
+        if let rawContent, !rawContent.isEmpty {
+            contentToStore = rawContent
+            DebugLogger.shared.log("Using raw WordPress content for post \(wpPost.id)", level: .debug, source: "SyncManager")
+        } else {
+            // Fallback to rendered HTML and decode entities for consistency
+            let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(renderedContent)
+            contentToStore = decodedContent
+            
+            let hasHTMLEntities = renderedContent.contains("&#") || renderedContent.contains("&amp;") || renderedContent.contains("&lt;") || renderedContent.contains("&gt;") || renderedContent.contains("&quot;")
+            if hasHTMLEntities {
+                DebugLogger.shared.log("=== HTML Entity Decoding Debug (rendered fallback) ===", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Post title: \(wpPost.title.rendered)", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Rendered content: \(String(renderedContent.prefix(200)))", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Decoded content: \(String(decodedContent.prefix(200)))", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Content changed: \(renderedContent != decodedContent)", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Rendered length: \(renderedContent.count), Decoded length: \(decodedContent.count)", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("=== End Debug ===", level: .debug, source: "SyncManager")
+            }
         }
         
-        post.content = HTMLHandler.shared.decodeHTMLEntitiesManually(wpPost.content.rendered)
+        post.content = contentToStore
         post.updateExcerpt() // Generate excerpt from decoded content
         post.slug = wpPost.slug
         post.createdDate = wpPost.dateAsDate
@@ -224,25 +237,30 @@ class SyncManager: ObservableObject {
         post.remoteID = wpPost.id
         post.title = cleanHTML(wpPost.title.rendered)
         
-        // Log the original content to see what entities we're dealing with
-        let originalContent = wpPost.content.rendered
-        let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(originalContent)
+        let rawContent = wpPost.content.raw
+        let renderedContent = wpPost.content.rendered
+        let contentToStore: String
         
-        // Check if content contains HTML entities
-        let hasHTMLEntities = originalContent.contains("&#") || originalContent.contains("&amp;") || originalContent.contains("&lt;") || originalContent.contains("&gt;") || originalContent.contains("&quot;")
-        
-        // Log for any post with HTML entities, not just those with "Formats" in title
-        if hasHTMLEntities {
-            DebugLogger.shared.log("=== CREATE HTML Entity Decoding Debug ===", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Post title: \(wpPost.title.rendered)", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Original content: \(String(originalContent.prefix(200)))", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Decoded content: \(String(decodedContent.prefix(200)))", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Content changed: \(originalContent != decodedContent)", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("Original length: \(originalContent.count), Decoded length: \(decodedContent.count)", level: .debug, source: "SyncManager")
-            DebugLogger.shared.log("=== End CREATE Debug ===", level: .debug, source: "SyncManager")
+        if let rawContent, !rawContent.isEmpty {
+            contentToStore = rawContent
+            DebugLogger.shared.log("Using raw WordPress content for new post \(wpPost.id)", level: .debug, source: "SyncManager")
+        } else {
+            let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(renderedContent)
+            contentToStore = decodedContent
+            
+            let hasHTMLEntities = renderedContent.contains("&#") || renderedContent.contains("&amp;") || renderedContent.contains("&lt;") || renderedContent.contains("&gt;") || renderedContent.contains("&quot;")
+            if hasHTMLEntities {
+                DebugLogger.shared.log("=== CREATE HTML Entity Decoding Debug (rendered fallback) ===", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Post title: \(wpPost.title.rendered)", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Rendered content: \(String(renderedContent.prefix(200)))", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Decoded content: \(String(decodedContent.prefix(200)))", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Content changed: \(renderedContent != decodedContent)", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("Rendered length: \(renderedContent.count), Decoded length: \(decodedContent.count)", level: .debug, source: "SyncManager")
+                DebugLogger.shared.log("=== End CREATE Debug ===", level: .debug, source: "SyncManager")
+            }
         }
         
-        post.content = HTMLHandler.shared.decodeHTMLEntitiesManually(wpPost.content.rendered)
+        post.content = contentToStore
         post.updateExcerpt() // Generate excerpt from decoded content
         post.slug = wpPost.slug
         post.createdDate = wpPost.dateAsDate
@@ -274,6 +292,108 @@ class SyncManager: ObservableObject {
     private func cleanHTML(_ html: String) -> String {
         // Use HTMLHandler for comprehensive HTML entity decoding and tag stripping
         return HTMLHandler.shared.htmlToPlainText(html)
+    }
+
+    private func postWithLatestAutosaveIfNeeded(
+        _ post: WordPressPost,
+        siteURL: String,
+        username: String,
+        password: String
+    ) async -> WordPressPost {
+        // Check autosaves and revisions for all posts to catch draft changes to published posts
+        var latestPost = post
+        var latestSource: String = "canonical"
+        var latestModifiedDate = post.modifiedAsDate
+
+        do {
+            if let autosave = try await WordPressAPI.shared.fetchLatestAutosave(
+                siteURL: siteURL,
+                username: username,
+                password: password,
+                postID: post.id
+            ) {
+                let autosaveHasContent = !(autosave.content.raw?.isEmpty ?? autosave.content.rendered.isEmpty)
+                if autosaveHasContent && autosave.modifiedAsDate > latestModifiedDate {
+                    DebugLogger.shared.log(
+                        "Using autosave for post \(post.id) (autosave modified: \(autosave.modified), post modified: \(post.modified))",
+                        level: .info,
+                        source: "SyncManager"
+                    )
+                    latestPost = WordPressPost(
+                        id: post.id,
+                        date: post.date,
+                        dateGmt: post.dateGmt,
+                        modified: autosave.modified,
+                        modifiedGmt: autosave.modifiedGmt,
+                        slug: post.slug,
+                        status: post.status,
+                        title: post.title,
+                        content: autosave.content,
+                        excerpt: post.excerpt
+                    )
+                    latestModifiedDate = autosave.modifiedAsDate
+                    latestSource = "autosave \(autosave.id)"
+                } else {
+                    DebugLogger.shared.log(
+                        "Autosave for post \(post.id) ignored (hasContent: \(autosaveHasContent), autosave modified: \(autosave.modified), baseline modified: \(latestModifiedDate))",
+                        level: .debug,
+                        source: "SyncManager"
+                    )
+                }
+            }
+        } catch {
+            DebugLogger.shared.log("Failed to fetch autosave for post \(post.id): \(error)", level: .debug, source: "SyncManager")
+        }
+
+        do {
+            if let revision = try await WordPressAPI.shared.fetchLatestRevision(
+                siteURL: siteURL,
+                username: username,
+                password: password,
+                postID: post.id
+            ) {
+                let revisionHasContent = !(revision.content.raw?.isEmpty ?? revision.content.rendered.isEmpty)
+                if revisionHasContent && revision.modifiedAsDate > latestModifiedDate {
+                    DebugLogger.shared.log(
+                        "Using revision \(revision.id) for post \(post.id) (revision modified: \(revision.modified), baseline modified: \(latestModifiedDate))",
+                        level: .info,
+                        source: "SyncManager"
+                    )
+                    latestPost = WordPressPost(
+                        id: post.id,
+                        date: post.date,
+                        dateGmt: post.dateGmt,
+                        modified: revision.modified,
+                        modifiedGmt: revision.modifiedGmt,
+                        slug: post.slug,
+                        status: post.status,
+                        title: revision.title ?? post.title,
+                        content: revision.content,
+                        excerpt: revision.excerpt ?? post.excerpt
+                    )
+                    latestModifiedDate = revision.modifiedAsDate
+                    latestSource = "revision \(revision.id)"
+                } else {
+                    DebugLogger.shared.log(
+                        "Revision for post \(post.id) ignored (hasContent: \(revisionHasContent), revision modified: \(revision.modified), baseline modified: \(latestModifiedDate))",
+                        level: .debug,
+                        source: "SyncManager"
+                    )
+                }
+            }
+        } catch {
+            DebugLogger.shared.log("Failed to fetch revision for post \(post.id): \(error)", level: .debug, source: "SyncManager")
+        }
+
+        if latestSource != "canonical" {
+            DebugLogger.shared.log(
+                "Post \(post.id) content sourced from \(latestSource)",
+                level: .debug,
+                source: "SyncManager"
+            )
+        }
+
+        return latestPost
     }
 }
 

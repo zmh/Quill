@@ -450,13 +450,16 @@ class WordPressAPI {
                 throw WordPressError.invalidURL
             }
 
+            let cacheBuster = String(Int(Date().timeIntervalSince1970))
             components.queryItems = [
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "per_page", value: String(attemptPerPage)),
-                URLQueryItem(name: "status", value: "any"),
+                URLQueryItem(name: "status", value: "publish,draft,future,pending,private"),
                 URLQueryItem(name: "orderby", value: "date"),
                 URLQueryItem(name: "order", value: "desc"),
-                URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,slug,status,title,content,excerpt")
+                URLQueryItem(name: "context", value: "edit"),
+                URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,slug,status,title,content,excerpt"),
+                URLQueryItem(name: "_", value: cacheBuster)
             ]
 
             guard let url = components.url else {
@@ -465,6 +468,7 @@ class WordPressAPI {
 
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
             request.setValue("clear", forHTTPHeaderField: "Alt-Svc")
 
             let credentials = "\(username):\(password)"
@@ -638,13 +642,16 @@ class WordPressAPI {
                 throw WordPressError.invalidURL
             }
 
+            let cacheBuster = String(Int(Date().timeIntervalSince1970))
             components.queryItems = [
                 URLQueryItem(name: "page", value: String(page)),
                 URLQueryItem(name: "per_page", value: String(attemptPerPage)),
-                URLQueryItem(name: "status", value: "any"),
+                URLQueryItem(name: "status", value: "publish,draft,future,pending,private"),
                 URLQueryItem(name: "orderby", value: "date"),
                 URLQueryItem(name: "order", value: "desc"),
-                URLQueryItem(name: "_fields", value: "id")
+                URLQueryItem(name: "context", value: "edit"),
+                URLQueryItem(name: "_fields", value: "id"),
+                URLQueryItem(name: "_", value: cacheBuster)
             ]
 
             guard let url = components.url else {
@@ -653,6 +660,7 @@ class WordPressAPI {
 
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
             let credentials = "\(username):\(password)"
             if let credentialData = credentials.data(using: .utf8) {
@@ -720,8 +728,12 @@ class WordPressAPI {
             throw WordPressError.invalidURL
         }
 
+        let cacheBuster = String(Int(Date().timeIntervalSince1970))
         components.queryItems = [
-            URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,slug,status,title,content,excerpt")
+            URLQueryItem(name: "status", value: "publish,draft,future,pending,private"),
+            URLQueryItem(name: "context", value: "edit"),
+            URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,slug,status,title,content,excerpt"),
+            URLQueryItem(name: "_", value: cacheBuster)
         ]
 
         guard let url = components.url else {
@@ -730,6 +742,7 @@ class WordPressAPI {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
         let credentials = "\(username):\(password)"
         if let credentialData = credentials.data(using: .utf8) {
@@ -775,6 +788,166 @@ class WordPressAPI {
         }
         
         return normalized
+    }
+
+    // MARK: - Autosaves & Revisions
+
+    func fetchLatestAutosave(
+        siteURL: String,
+        username: String,
+        password: String,
+        postID: Int
+    ) async throws -> WordPressAutosave? {
+        let baseURL = normalizeURL(siteURL)
+
+        guard var components = URLComponents(string: "\(baseURL)/wp-json/wp/v2/posts/\(postID)/autosaves") else {
+            throw WordPressError.invalidURL
+        }
+
+        let cacheBuster = String(Int(Date().timeIntervalSince1970))
+        components.queryItems = [
+            URLQueryItem(name: "context", value: "edit"),
+            URLQueryItem(name: "per_page", value: "1"),
+            URLQueryItem(name: "orderby", value: "date"),
+            URLQueryItem(name: "order", value: "desc"),
+            URLQueryItem(name: "_fields", value: "id,modified,modified_gmt,content"),
+            URLQueryItem(name: "_", value: cacheBuster)
+        ]
+
+        guard let url = components.url else {
+            throw WordPressError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("clear", forHTTPHeaderField: "Alt-Svc")
+
+        let credentials = "\(username):\(password)"
+        if let credentialData = credentials.data(using: .utf8) {
+            let base64Credentials = credentialData.base64EncodedString()
+            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        }
+
+        DebugLogger.shared.log("Fetching autosaves for post \(postID)", level: .debug, source: "WordPressAPI")
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WordPressError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                let decoder = JSONDecoder()
+                let autosaves = try decoder.decode([WordPressAutosave].self, from: data)
+                if let first = autosaves.first {
+                    DebugLogger.shared.log(
+                        "Fetched autosave \(first.id) for post \(postID) (modified: \(first.modified))",
+                        level: .debug,
+                        source: "WordPressAPI"
+                    )
+                } else {
+                    DebugLogger.shared.log("No autosaves found for post \(postID)", level: .debug, source: "WordPressAPI")
+                }
+                return autosaves.first
+            } catch {
+                // WordPress might return an error object instead of an array
+                if let responseString = String(data: data, encoding: .utf8) {
+                    DebugLogger.shared.log("Autosave decoding failed for post \(postID), response: \(responseString)", level: .warning, source: "WordPressAPI")
+                }
+                DebugLogger.shared.log("Autosave decoding error: \(error)", level: .debug, source: "WordPressAPI")
+                return nil
+            }
+        } else if httpResponse.statusCode == 401 {
+            throw WordPressError.unauthorized
+        } else if httpResponse.statusCode == 404 {
+            return nil
+        } else {
+            if let responseString = String(data: data, encoding: .utf8) {
+                DebugLogger.shared.log("Autosave fetch error response: \(responseString)", level: .error, source: "WordPressAPI")
+            }
+            throw WordPressError.httpError(statusCode: httpResponse.statusCode)
+        }
+    }
+
+    func fetchLatestRevision(
+        siteURL: String,
+        username: String,
+        password: String,
+        postID: Int
+    ) async throws -> WordPressRevision? {
+        let baseURL = normalizeURL(siteURL)
+
+        guard var components = URLComponents(string: "\(baseURL)/wp-json/wp/v2/posts/\(postID)/revisions") else {
+            throw WordPressError.invalidURL
+        }
+
+        let cacheBuster = String(Int(Date().timeIntervalSince1970))
+        components.queryItems = [
+            URLQueryItem(name: "context", value: "edit"),
+            URLQueryItem(name: "per_page", value: "1"),
+            URLQueryItem(name: "orderby", value: "date"),
+            URLQueryItem(name: "order", value: "desc"),
+            URLQueryItem(name: "_fields", value: "id,date,date_gmt,modified,modified_gmt,title,content,excerpt"),
+            URLQueryItem(name: "_", value: cacheBuster)
+        ]
+
+        guard let url = components.url else {
+            throw WordPressError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("clear", forHTTPHeaderField: "Alt-Svc")
+
+        let credentials = "\(username):\(password)"
+        if let credentialData = credentials.data(using: .utf8) {
+            let base64Credentials = credentialData.base64EncodedString()
+            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        }
+
+        DebugLogger.shared.log("Fetching revisions for post \(postID)", level: .debug, source: "WordPressAPI")
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WordPressError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                let decoder = JSONDecoder()
+                let revisions = try decoder.decode([WordPressRevision].self, from: data)
+                if let first = revisions.first {
+                    DebugLogger.shared.log(
+                        "Fetched revision \(first.id) for post \(postID) (modified: \(first.modified))",
+                        level: .debug,
+                        source: "WordPressAPI"
+                    )
+                } else {
+                    DebugLogger.shared.log("No revisions found for post \(postID)", level: .debug, source: "WordPressAPI")
+                }
+                return revisions.first
+            } catch {
+                // WordPress might return an error object instead of an array
+                if let responseString = String(data: data, encoding: .utf8) {
+                    DebugLogger.shared.log("Revision decoding failed for post \(postID), response: \(responseString)", level: .warning, source: "WordPressAPI")
+                }
+                DebugLogger.shared.log("Revision decoding error: \(error)", level: .debug, source: "WordPressAPI")
+                return nil
+            }
+        } else if httpResponse.statusCode == 401 {
+            throw WordPressError.unauthorized
+        } else if httpResponse.statusCode == 404 {
+            return nil
+        } else {
+            if let responseString = String(data: data, encoding: .utf8) {
+                DebugLogger.shared.log("Revision fetch error response: \(responseString)", level: .error, source: "WordPressAPI")
+            }
+            throw WordPressError.httpError(statusCode: httpResponse.statusCode)
+        }
     }
 }
 
@@ -856,6 +1029,71 @@ struct WordPressPost: Codable {
 
 struct RenderedContent: Codable {
     let rendered: String
+    let raw: String?
+    let isProtected: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case rendered
+        case raw
+        case isProtected = "protected"
+    }
+}
+
+struct WordPressAutosave: Codable {
+    let id: Int
+    let modified: String
+    let modifiedGmt: String
+    let content: RenderedContent
+
+    var modifiedAsDate: Date {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        formatter.timeZone = TimeZone(abbreviation: "UTC")
+
+        if let date = formatter.date(from: modified) {
+            return date
+        }
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        return isoFormatter.date(from: modified) ?? Date()
+    }
+}
+
+struct WordPressRevision: Codable {
+    let id: Int
+    let date: String
+    let dateGmt: String
+    let modified: String
+    let modifiedGmt: String
+    let title: RenderedContent?
+    let content: RenderedContent
+    let excerpt: RenderedContent?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case date
+        case dateGmt = "date_gmt"
+        case modified
+        case modifiedGmt = "modified_gmt"
+        case title
+        case content
+        case excerpt
+    }
+
+    var modifiedAsDate: Date {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        formatter.timeZone = TimeZone(abbreviation: "UTC")
+
+        if let date = formatter.date(from: modified) {
+            return date
+        }
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        return isoFormatter.date(from: modified) ?? Date()
+    }
 }
 
 struct WordPressMedia: Codable {
