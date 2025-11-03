@@ -12,8 +12,8 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var posts: [Post]
     @Query private var siteConfigs: [SiteConfiguration]
-    
-    @State private var selectedPost: Post?
+
+    @State private var selectedPostIDs: Set<Post.ID> = []
     @State private var searchText = ""
     @State private var filterStatus: PostStatus? = nil
     @State private var showingCompose = false
@@ -25,6 +25,12 @@ struct ContentView: View {
     @StateObject private var syncManager = SyncManager.shared
     @AppStorage("matchSystemAppearance") private var matchSystemAppearance = true
     @AppStorage("preferredAppearance") private var preferredAppearance = "light"
+
+    // Computed property to get the currently selected post
+    private var selectedPost: Post? {
+        guard let firstID = selectedPostIDs.first else { return nil }
+        return posts.first(where: { $0.id == firstID })
+    }
     
     var body: some View {
         #if os(iOS)
@@ -33,7 +39,7 @@ struct ContentView: View {
             NavigationView {
                 PostsListView(
                     posts: posts,
-                    selectedPost: $selectedPost,
+                    selectedPostIDs: $selectedPostIDs,
                     searchText: $searchText,
                     filterStatus: $filterStatus,
                     syncManager: syncManager,
@@ -55,11 +61,11 @@ struct ContentView: View {
                 Text("Posts")
             }
             .tag(0)
-            
+
             // Create Post Tab
             NavigationView {
                 CreatePostTabView(
-                    selectedPost: $selectedPost,
+                    selectedPostIDs: $selectedPostIDs,
                     modelContext: modelContext,
                     selectedTab: $selectedTab
                 )
@@ -98,7 +104,7 @@ struct ContentView: View {
             // Posts List
             PostsListView(
                 posts: posts,
-                selectedPost: $selectedPost,
+                selectedPostIDs: $selectedPostIDs,
                 searchText: $searchText,
                 filterStatus: $filterStatus,
                 syncManager: syncManager,
@@ -146,9 +152,8 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("selectPost"))) { notification in
             if let userInfo = notification.userInfo,
-               let postID = userInfo["postID"] as? UUID,
-               let post = posts.first(where: { $0.id == postID }) {
-                selectedPost = post
+               let postID = userInfo["postID"] as? UUID {
+                selectedPostIDs = [postID]
             }
         }
         #endif
@@ -168,15 +173,15 @@ struct ContentView: View {
             content: content,
             status: .draft
         )
-        
+
         modelContext.insert(post)
-        selectedPost = post
+        selectedPostIDs = [post.id]
     }
 }
 
 struct PostsListView: View {
     let posts: [Post]
-    @Binding var selectedPost: Post?
+    @Binding var selectedPostIDs: Set<Post.ID>
     @Binding var searchText: String
     @Binding var filterStatus: PostStatus?
     let syncManager: SyncManager
@@ -231,7 +236,7 @@ struct PostsListView: View {
             .padding(.bottom, 4)
             
             // Posts List
-            List(selection: $selectedPost) {
+            List(selection: $selectedPostIDs) {
                 ForEach(filteredPosts) { post in
                     #if os(iOS)
                     NavigationLink(destination: PostEditorView(post: post)) {
@@ -247,14 +252,23 @@ struct PostsListView: View {
                     }
                     #else
                     PostRowView(post: post)
-                        .tag(post)
+                        .tag(post.id)
                         .contextMenu {
-                            Button(action: {
-                                deletePost(post)
-                            }) {
-                                Label("Delete Post", systemImage: "trash")
+                            if selectedPostIDs.count > 1 {
+                                Button(action: {
+                                    deleteSelectedPosts()
+                                }) {
+                                    Label("Delete \(selectedPostIDs.count) Posts", systemImage: "trash")
+                                }
+                                .foregroundColor(.red)
+                            } else {
+                                Button(action: {
+                                    deletePost(post)
+                                }) {
+                                    Label("Delete Post", systemImage: "trash")
+                                }
+                                .foregroundColor(.red)
                             }
-                            .foregroundColor(.red)
                         }
                     #endif
                 }
@@ -334,7 +348,7 @@ struct PostsListView: View {
                 )
 
                 modelContext.insert(post)
-                selectedPost = post
+                selectedPostIDs = [post.id]
             }
         }
         #endif
@@ -349,10 +363,10 @@ struct PostsListView: View {
     
     private func deletePost(_ post: Post) {
         // Clear selection if we're deleting the currently selected post
-        if selectedPost?.id == post.id {
-            selectedPost = nil
+        if selectedPostIDs.contains(post.id) {
+            selectedPostIDs.remove(post.id)
         }
-        
+
         // If post has a remote ID, delete from server first
         if let remoteID = post.remoteID, let siteConfig = siteConfig {
             Task { @MainActor in
@@ -371,13 +385,51 @@ struct PostsListView: View {
                     DebugLogger.shared.log("Failed to delete post from server: \(error)", level: .error, source: "ContentView")
                     // Continue with local deletion even if server deletion fails
                 }
-                
+
                 // Delete locally after server deletion (or if it fails)
                 modelContext.delete(post)
             }
         } else {
             // No remote ID, just delete locally
             modelContext.delete(post)
+        }
+    }
+
+    private func deleteSelectedPosts() {
+        // Get all posts that are currently selected
+        let postsToDelete = posts.filter { selectedPostIDs.contains($0.id) }
+
+        // Clear selection
+        selectedPostIDs.removeAll()
+
+        // Delete each selected post
+        for post in postsToDelete {
+            // If post has a remote ID, delete from server first
+            if let remoteID = post.remoteID, let siteConfig = siteConfig {
+                Task { @MainActor in
+                    do {
+                        // Get password from keychain
+                        if let password = try KeychainManager.shared.retrieve(for: siteConfig.keychainIdentifier) {
+                            try await WordPressAPI.shared.deletePost(
+                                siteURL: siteConfig.siteURL,
+                                username: siteConfig.username,
+                                password: password,
+                                postID: remoteID
+                            )
+                            DebugLogger.shared.log("Successfully deleted post from server: \(remoteID)", level: .info, source: "ContentView")
+                        }
+                    } catch {
+                        DebugLogger.shared.log("Failed to delete post from server: \(error)", level: .error, source: "ContentView")
+                        // Continue with local deletion even if server deletion fails
+                    }
+
+                    // Delete locally after server deletion (or if it fails)
+                    modelContext.delete(post)
+                }
+            } else {
+                // No remote ID, just delete locally
+                modelContext.delete(post)
+            }
         }
     }
 }
@@ -973,7 +1025,7 @@ enum PublishError: LocalizedError {
 }
 
 struct CreatePostTabView: View {
-    @Binding var selectedPost: Post?
+    @Binding var selectedPostIDs: Set<Post.ID>
     let modelContext: ModelContext
     @Binding var selectedTab: Int
     @State private var postTitle = ""
@@ -1037,14 +1089,14 @@ struct CreatePostTabView: View {
             content: postContent.isEmpty ? "<p></p>" : "<p>\(postContent)</p>",
             status: .draft
         )
-        
+
         modelContext.insert(post)
-        selectedPost = post
-        
+        selectedPostIDs = [post.id]
+
         // Clear the form
         postTitle = ""
         postContent = ""
-        
+
         // Switch to posts tab to show the new post
         selectedTab = 0
     }
