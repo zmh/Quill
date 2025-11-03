@@ -5,6 +5,7 @@
 //  Created by Zachary Hamed on 5/31/25.
 //
 
+import Foundation
 import SwiftUI
 import SwiftData
 
@@ -20,10 +21,23 @@ struct QuillApp: App {
             SiteConfiguration.self,
             WritingSession.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let identifier = Bundle.main.bundleIdentifier ?? "QuillApp"
+        let baseDirectory = appSupport.appendingPathComponent(identifier, isDirectory: true)
+
+        let storeURL = baseDirectory.appendingPathComponent("default.store")
+        DebugLogger.shared.log("SwiftData store URL: \(storeURL.path)", level: .info, source: "QuillApp")
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            try FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+        } catch {
+            fatalError("Failed to prepare Application Support directory: \(error)")
+        }
+
+        do {
+            let configuration = ModelConfiguration(schema: schema, url: storeURL)
+            return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
