@@ -13,7 +13,7 @@ struct ContentView: View {
     @Query private var posts: [Post]
     @Query private var siteConfigs: [SiteConfiguration]
 
-    @State private var selectedPostIDs: Set<Post.ID> = []
+    @State private var selectedPostIDs: Set<UUID> = []
     @State private var searchText = ""
     @State private var filterStatus: PostStatus? = nil
     @State private var showingCompose = false
@@ -181,7 +181,7 @@ struct ContentView: View {
 
 struct PostsListView: View {
     let posts: [Post]
-    @Binding var selectedPostIDs: Set<Post.ID>
+    @Binding var selectedPostIDs: Set<UUID>
     @Binding var searchText: String
     @Binding var filterStatus: PostStatus?
     let syncManager: SyncManager
@@ -277,6 +277,22 @@ struct PostsListView: View {
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
             .background(.clear)
+
+            // Sync status indicator at bottom (like Mail app)
+            if syncManager.isSyncing {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.8)
+                    Text("Syncing posts...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+            }
         }
         .background(.ultraThinMaterial)
         #if !os(iOS)
@@ -297,27 +313,12 @@ struct PostsListView: View {
                     Button(action: {
                         NotificationCenter.default.post(name: .openSettings, object: nil)
                     }) {
-                        Label("Settings", systemImage: "gear")
+                        Image(systemName: "gear")
+                            .font(.system(size: 20))
                     }
+                    .buttonStyle(.borderless)
+                    .help("Settings")
                     .keyboardShortcut(",", modifiers: .command)
-                }
-
-                ToolbarItem(placement: .automatic) {
-                    if syncManager.isSyncing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(0.8)
-                    } else {
-                        Button(action: {
-                            if let siteConfig = siteConfig {
-                                Task { @MainActor in
-                                    await syncManager.syncPosts(siteConfig: siteConfig, modelContext: modelContext)
-                                }
-                            }
-                        }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                    }
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -332,8 +333,11 @@ struct PostsListView: View {
                         showingCompose = true
                         #endif
                     }) {
-                        Label("New Post", systemImage: "square.and.pencil")
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 20))
                     }
+                    .buttonStyle(.borderless)
+                    .help("New Post")
                     .keyboardShortcut("n", modifiers: .command)
                 }
             }
@@ -490,6 +494,7 @@ struct PostEditorView: View {
     @State private var showMetadata = false
     @State private var showStatistics = false
     @State private var showGoalProgress = false
+    @State private var isTitleHovered = false
     @State private var currentPostID: UUID?
     @State private var sessionStartWordCount: Int = 0
     @State private var lastRecordedSessionWords: Int = 0
@@ -506,6 +511,11 @@ struct PostEditorView: View {
     @State private var isPublishing = false
     @State private var publishError: Error?
     @State private var showPublishError = false
+
+    // Sync state
+    @State private var showConflictResolution = false
+    @State private var showPullWarning = false
+    @State private var isPulling = false
     
     
     var body: some View {
@@ -537,35 +547,31 @@ struct PostEditorView: View {
             }
 
             ToolbarItem(placement: .principal) {
-                TextField("Title", text: $post.titlePlainText)
-                    .font(.headline)
-                    .textFieldStyle(.plain)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 400)
-            }
-
-            ToolbarItemGroup(placement: .primaryAction) {
-                if siteConfigs.first != nil, post.remoteID != nil {
-                    Button(action: { openPostOnSite() }) {
-                        Image(systemName: "arrow.up.right.square")
-                    }
-                    .help(post.status == .published ? "View on Site" : "Edit in WordPress")
-                }
-                
                 Button(action: { showMetadata.toggle() }) {
-                    Image(systemName: "info.circle")
+                    Text(post.title.isEmpty ? "Untitled" : post.title)
+                        .font(.body)
+                        .lineLimit(1)
+                        .overlay(alignment: .trailing) {
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .opacity(isTitleHovered ? 1 : 0)
+                                .offset(x: 16)
+                        }
+                }
+                .buttonStyle(.plain)
+                .onHover { isHovered in
+                    isTitleHovered = isHovered
                 }
                 .popover(isPresented: $showMetadata, arrowEdge: .bottom) {
                     PostMetadataView(post: post)
-                        .frame(width: 360, height: 280)
+                        .frame(width: 360, height: 380)
                 }
+            }
 
-                Button(action: { publishPost() }) {
-                    Text(isPublishing ? getProgressButtonText() : getButtonText())
-                }
-                .buttonStyle(QuillButtonStyle())
-                .disabled(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges)
-                .keyboardShortcut("s", modifiers: .command)
+            ToolbarItemGroup(placement: .primaryAction) {
+
+                syncButton
                 .onAppear {
                     DebugLogger.shared.log("Button state - disabled: \(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty || !post.hasUnsavedChanges), hasUnsavedChanges: \(post.hasUnsavedChanges)", level: .debug, source: "ContentView")
                 }
@@ -602,6 +608,13 @@ struct PostEditorView: View {
                     lastLoadedPostID = newPostID
                     webViewKey = UUID()
                 }
+
+                // Check for remote changes when post is selected
+                if let siteConfig = siteConfigs.first {
+                    Task { @MainActor in
+                        await SyncManager.shared.checkForRemoteChanges(post: post, siteConfig: siteConfig)
+                    }
+                }
             }
         }
         .onChange(of: editorTypeface) { _, _ in
@@ -623,8 +636,85 @@ struct PostEditorView: View {
         } message: {
             Text(publishError?.localizedDescription ?? "Unknown error occurred while publishing")
         }
+        .alert("Sync Conflict", isPresented: $showConflictResolution) {
+            Button("Cancel", role: .cancel) { }
+            Button("Save Local Changes to Server") {
+                publishPost()
+            }
+            Button("Discard Local Changes & Pull", role: .destructive) {
+                pullLatest()
+            }
+        } message: {
+            Text("You have unsaved local changes, but this post was also modified on your WordPress site.\n\nWhich version would you like to keep?")
+        }
+        .alert("Discard Local Changes?", isPresented: $showPullWarning) {
+            Button("Cancel", role: .cancel) { }
+            Button("Discard & Pull", role: .destructive) {
+                pullLatest()
+            }
+        } message: {
+            Text("You have unsaved local changes that will be permanently lost.\n\nPulling will replace your local version with the server version.")
+        }
     }
-    
+
+    @ViewBuilder
+    private var syncButton: some View {
+        let currentState = post.syncState
+        let _ = DebugLogger.shared.log("Rendering syncButton with state: \(currentState)", level: .debug, source: "ContentView")
+
+        switch currentState {
+        case .upToDate:
+            // Grey/disabled upload button (no changes)
+            Button(action: {}) {
+                Image(systemName: "arrow.up.circle")
+                    .font(.system(size: 20))
+            }
+            .buttonStyle(.borderless)
+            .disabled(true)
+            .foregroundStyle(.secondary)
+            .help("No changes to upload")
+
+        case .updateAvailable:
+            // Blue/enabled upload button (local changes to push)
+            Button(action: { publishPost() }) {
+                Image(systemName: isPublishing ? "arrow.up.circle.fill" : "arrow.up.circle")
+                    .font(.system(size: 20))
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.pulse, isActive: isPublishing)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.blue)
+            .disabled(isPublishing || post.title.isEmpty || post.content.isEmpty || siteConfigs.isEmpty)
+            .keyboardShortcut("s", modifiers: .command)
+            .help("Upload changes to server")
+
+        case .pullAvailable:
+            // Blue/enabled download button (remote changes to pull)
+            Button(action: { pullLatest() }) {
+                Image(systemName: isPulling ? "arrow.down.circle.fill" : "arrow.down.circle")
+                    .font(.system(size: 20))
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.pulse, isActive: isPulling)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.blue)
+            .disabled(isPulling || siteConfigs.isEmpty)
+            .keyboardShortcut("s", modifiers: .command)
+            .help("Download changes from server")
+
+        case .conflict:
+            // Blue/enabled sync warning button (conflict)
+            Button(action: { showConflictResolution = true }) {
+                Image(systemName: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90")
+                    .font(.system(size: 20))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.blue)
+            .keyboardShortcut("s", modifiers: .command)
+            .help("Sync conflict - resolve changes")
+        }
+    }
+
     private func getButtonText() -> String {
         if post.remoteID == nil {
             // New post - button text depends on status
@@ -713,11 +803,11 @@ struct PostEditorView: View {
                 
                 // Update local post with remote data
                 post.remoteID = wordPressPost.id
-                post.modifiedDate = Date()
-                
+                post.modifiedDate = wordPressPost.modifiedAsDate  // Use server's modified date as baseline
+
                 // Update post status from WordPress response
                 post.status = PostStatus.from(wordPressStatus: wordPressPost.status)
-                
+
                 // Mark as synced and update baseline hash
                 post.markAsSynced()
                 
@@ -740,7 +830,79 @@ struct PostEditorView: View {
             isPublishing = false
         }
     }
-    
+
+    private func pullLatest() {
+        guard let siteConfig = siteConfigs.first else {
+            publishError = PublishError.noSiteConfiguration
+            showPublishError = true
+            return
+        }
+
+        Task { @MainActor in
+            isPulling = true
+
+            do {
+                // Get password from keychain
+                guard let password = try KeychainManager.shared.retrieve(for: siteConfig.keychainIdentifier) else {
+                    throw PublishError.noPassword
+                }
+
+                guard let remoteID = post.remoteID else {
+                    throw PublishError.noRemoteID
+                }
+
+                // Fetch latest post from WordPress
+                let remotePost = try await WordPressAPI.shared.fetchSinglePost(
+                    siteURL: siteConfig.siteURL,
+                    username: siteConfig.username,
+                    password: password,
+                    postID: remoteID
+                )
+
+                // Update local post with remote content
+                post.title = HTMLHandler.shared.htmlToPlainText(remotePost.title.rendered)
+
+                // Prefer raw content when available
+                let contentToStore: String
+                if let rawContent = remotePost.content.raw, !rawContent.isEmpty {
+                    contentToStore = rawContent
+                } else {
+                    contentToStore = HTMLHandler.shared.decodeHTMLEntitiesManually(remotePost.content.rendered)
+                }
+
+                post.content = contentToStore
+                post.updateExcerpt()
+                post.slug = remotePost.slug
+                post.modifiedDate = remotePost.modifiedAsDate
+                post.status = PostStatus.from(wordPressStatus: remotePost.status)
+
+                if remotePost.status == "publish" || remotePost.status == "future" {
+                    post.publishedDate = remotePost.dateAsDate
+                }
+
+                let plainTextContent = HTMLHandler.shared.htmlToPlainText(post.content)
+                post.wordCount = plainTextContent.split(separator: " ").count
+
+                // Mark as synced
+                post.markAsSynced()
+                post.lastRemoteModifiedDate = remotePost.modifiedAsDate
+                post.lastCheckedDate = Date()
+
+                // Force WebView refresh to show pulled content
+                webViewKey = UUID()
+
+                DebugLogger.shared.log("Successfully pulled latest changes for post \(post.title)", level: .info, source: "ContentView")
+
+            } catch {
+                publishError = error
+                showPublishError = true
+                DebugLogger.shared.log("Failed to pull latest: \(error)", level: .error, source: "ContentView")
+            }
+
+            isPulling = false
+        }
+    }
+
     private func updatePost() {
         // Update immediately without deferring
         post.modifiedDate = Date()
@@ -896,7 +1058,8 @@ struct QuickComposeView: View {
 
 struct PostMetadataView: View {
     @Bindable var post: Post
-    
+    @Query private var siteConfigs: [SiteConfiguration]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Title field
@@ -970,7 +1133,35 @@ struct PostMetadataView: View {
                     .font(.system(size: 11))
                 Spacer()
             }
-            
+
+            // View/Edit on Site buttons
+            if siteConfigs.first != nil, post.remoteID != nil {
+                Divider()
+                    .padding(.vertical, 4)
+
+                VStack(spacing: 8) {
+                    Button(action: { previewPostInWordPress() }) {
+                        HStack {
+                            Image(systemName: "eye")
+                            Text("Preview in WordPress")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    Button(action: { openPostOnSite() }) {
+                        HStack {
+                            Image(systemName: "arrow.up.right.square")
+                            Text(post.status == .published ? "View on Site" : "Edit in WordPress")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                }
+            }
+
             Spacer()
         }
         .padding(20)
@@ -997,7 +1188,66 @@ struct PostMetadataView: View {
         if newStatus == .draft && oldStatus != .draft {
             post.publishedDate = nil
         }
-        
+    }
+
+    private func previewPostInWordPress() {
+        guard let siteConfig = siteConfigs.first,
+              let remoteID = post.remoteID else { return }
+
+        // Use the permalink from WordPress if available, otherwise construct preview URL
+        let previewURL: String
+        if let permalink = post.permalink {
+            previewURL = permalink
+        } else {
+            // Fallback: Extract base domain and use ?p={postID} format
+            guard let url = URL(string: siteConfig.siteURL),
+                  let scheme = url.scheme,
+                  let host = url.host else { return }
+
+            let baseURL = "\(scheme)://\(host)"
+            previewURL = "\(baseURL)/?p=\(remoteID)"
+        }
+
+        #if os(macOS)
+        if let url = URL(string: previewURL) {
+            NSWorkspace.shared.open(url)
+        }
+        #else
+        if let url = URL(string: previewURL) {
+            UIApplication.shared.open(url)
+        }
+        #endif
+    }
+
+    private func openPostOnSite() {
+        guard let siteConfig = siteConfigs.first else { return }
+
+        // Construct the post URL
+        var siteURL = siteConfig.siteURL
+        if !siteURL.hasSuffix("/") {
+            siteURL += "/"
+        }
+
+        // For drafts, use WordPress admin edit URL
+        let postURL: String
+        if post.status == .draft, let remoteID = post.remoteID {
+            postURL = siteURL + "wp-admin/post.php?post=\(remoteID)&action=edit"
+        } else {
+            // For published posts, use slug if available, otherwise use post ID
+            let postIdentifier = post.slug.isEmpty ? String(post.remoteID ?? 0) : post.slug
+            postURL = siteURL + postIdentifier
+        }
+
+        #if os(macOS)
+        if let url = URL(string: postURL) {
+            NSWorkspace.shared.open(url)
+        }
+        #else
+        if let url = URL(string: postURL) {
+            UIApplication.shared.open(url)
+        }
+        #endif
+
         post.modifiedDate = Date()
     }
 }
@@ -1009,7 +1259,8 @@ enum PublishError: LocalizedError {
     case emptyTitle
     case emptyContent
     case noPassword
-    
+    case noRemoteID
+
     var errorDescription: String? {
         switch self {
         case .noSiteConfiguration:
@@ -1020,12 +1271,14 @@ enum PublishError: LocalizedError {
             return "Post content cannot be empty"
         case .noPassword:
             return "WordPress password not found. Please check your site settings."
+        case .noRemoteID:
+            return "This post has not been synced to WordPress yet."
         }
     }
 }
 
 struct CreatePostTabView: View {
-    @Binding var selectedPostIDs: Set<Post.ID>
+    @Binding var selectedPostIDs: Set<UUID>
     let modelContext: ModelContext
     @Binding var selectedTab: Int
     @State private var postTitle = ""

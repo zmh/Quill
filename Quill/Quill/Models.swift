@@ -18,13 +18,17 @@ final class Post {
     var excerpt: String
     var status: PostStatus
     var slug: String
+    var permalink: String?  // WordPress permalink from the API
     var wordCount: Int
     var createdDate: Date
     var modifiedDate: Date
     var publishedDate: Date?
     var syncStatus: SyncStatus
     var lastSyncedHash: String = ""
-    
+    var lastRemoteModifiedDate: Date?
+    var lastCheckedDate: Date?
+    var lastSyncedModifiedDate: Date?  // Baseline: modified date at time of last successful sync
+
     init(title: String = "", content: String = "", status: PostStatus = .draft) {
         self.id = UUID()
         self.title = title
@@ -103,19 +107,58 @@ final class Post {
         if remoteID == nil {
             return true
         }
-        
+
         // If we don't have a baseline hash yet, consider it changed
         if lastSyncedHash.isEmpty {
             return true
         }
-        
+
         // Check if current content hash differs from last synced hash
         return contentHash != lastSyncedHash
     }
-    
-    // Update the baseline hash after successful sync
+
+    // Check if remote has newer changes
+    @Transient var hasRemoteChanges: Bool {
+        guard let remoteModified = lastRemoteModifiedDate else {
+            return false
+        }
+
+        // Compare remote modified date with the baseline (last synced modified date)
+        // If we don't have a baseline yet, use the current modified date
+        let baseline = lastSyncedModifiedDate ?? modifiedDate
+        return remoteModified > baseline
+    }
+
+    // Compute the current sync state
+    @Transient var syncState: PostSyncState {
+        let hasLocal = hasUnsavedChanges
+        let hasRemote = hasRemoteChanges
+
+        let state: PostSyncState
+        if !hasLocal && !hasRemote {
+            state = .upToDate
+        } else if !hasLocal && hasRemote {
+            state = .pullAvailable
+        } else if hasLocal && !hasRemote {
+            state = .updateAvailable
+        } else {
+            state = .conflict
+        }
+
+        // Debug logging
+        DebugLogger.shared.log(
+            "syncState for '\(title)': \(state) (hasLocal=\(hasLocal), hasRemote=\(hasRemote), baseline=\(lastSyncedModifiedDate?.description ?? "nil"), remote=\(lastRemoteModifiedDate?.description ?? "nil"), local=\(modifiedDate))",
+            level: .debug,
+            source: "Post"
+        )
+
+        return state
+    }
+
+    // Update the baseline hash and modified date after successful sync
     func markAsSynced() {
         lastSyncedHash = contentHash
+        lastSyncedModifiedDate = modifiedDate  // Store baseline for remote change detection
         syncStatus = .synced
     }
     
@@ -154,6 +197,13 @@ enum SyncStatus: String, Codable {
     case pendingUpload = "pending_upload"
     case pendingUpdate = "pending_update"
     case conflict = "conflict"
+}
+
+enum PostSyncState {
+    case upToDate          // No local or remote changes
+    case pullAvailable     // Remote changes, no local changes
+    case updateAvailable   // Local changes, no remote changes
+    case conflict          // Both local and remote changes
 }
 
 // MARK: - WordPress API Extensions

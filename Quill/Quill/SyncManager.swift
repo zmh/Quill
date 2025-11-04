@@ -18,6 +18,48 @@ class SyncManager: ObservableObject {
     private init() {}
     
     @MainActor
+    func checkForRemoteChanges(post: Post, siteConfig: SiteConfiguration) async {
+        // Only check posts that have been synced to WordPress
+        guard let remoteID = post.remoteID else {
+            DebugLogger.shared.log("Skipping remote check for post without remoteID", level: .debug, source: "SyncManager")
+            return
+        }
+
+        do {
+            // Get credentials
+            let keychainIdentifier = siteConfig.keychainIdentifier
+            let siteURL = siteConfig.siteURL
+            let username = siteConfig.username
+
+            guard let password = try KeychainManager.shared.retrieve(for: keychainIdentifier) else {
+                DebugLogger.shared.log("No password found for remote check", level: .warning, source: "SyncManager")
+                return
+            }
+
+            // Fetch lightweight post metadata from WordPress
+            let remotePost = try await WordPressAPI.shared.fetchSinglePost(
+                siteURL: siteURL,
+                username: username,
+                password: password,
+                postID: remoteID
+            )
+
+            // Update tracking fields
+            post.lastRemoteModifiedDate = remotePost.modifiedAsDate
+            post.lastCheckedDate = Date()
+
+            DebugLogger.shared.log(
+                "Remote check complete for post \(post.title): baseline \(post.lastSyncedModifiedDate?.description ?? "none"), local modified \(post.modifiedDate), remote modified \(remotePost.modifiedAsDate), hasRemoteChanges: \(post.hasRemoteChanges)",
+                level: .debug,
+                source: "SyncManager"
+            )
+
+        } catch {
+            DebugLogger.shared.log("Failed to check for remote changes: \(error)", level: .error, source: "SyncManager")
+        }
+    }
+
+    @MainActor
     func syncLocalChanges(siteConfig: SiteConfiguration, modelContext: ModelContext) async {
         DebugLogger.shared.log("Starting upload of local changes...", level: .info, source: "SyncManager")
         
@@ -208,9 +250,10 @@ class SyncManager: ObservableObject {
         post.content = contentToStore
         post.updateExcerpt() // Generate excerpt from decoded content
         post.slug = wpPost.slug
+        post.permalink = wpPost.link
         post.createdDate = wpPost.dateAsDate
         post.modifiedDate = wpPost.modifiedAsDate
-        
+
         // Map WordPress status to our PostStatus
         switch wpPost.status {
         case "publish":
@@ -263,10 +306,11 @@ class SyncManager: ObservableObject {
         post.content = contentToStore
         post.updateExcerpt() // Generate excerpt from decoded content
         post.slug = wpPost.slug
+        post.permalink = wpPost.link
         post.createdDate = wpPost.dateAsDate
         post.modifiedDate = wpPost.modifiedAsDate
-        
-        
+
+
         // Map WordPress status
         switch wpPost.status {
         case "publish":
@@ -327,6 +371,7 @@ class SyncManager: ObservableObject {
                         modifiedGmt: autosave.modifiedGmt,
                         slug: post.slug,
                         status: post.status,
+                        link: post.link,
                         title: post.title,
                         content: autosave.content,
                         excerpt: post.excerpt
@@ -367,6 +412,7 @@ class SyncManager: ObservableObject {
                         modifiedGmt: revision.modifiedGmt,
                         slug: post.slug,
                         status: post.status,
+                        link: post.link,
                         title: revision.title ?? post.title,
                         content: revision.content,
                         excerpt: revision.excerpt ?? post.excerpt
