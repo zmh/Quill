@@ -53,17 +53,17 @@ struct WriterQuoteEmptyStateView: View {
 
     private var quoteTextColor: Color {
         #if os(macOS)
-        Color(nsColor: NSColor.secondaryLabelColor)
+        Color(nsColor: NSColor.tertiaryLabelColor).opacity(0.5)
         #else
-        Color(UIColor.secondaryLabel)
+        Color(UIColor.tertiaryLabel).opacity(0.5)
         #endif
     }
 
     private var authorTextColor: Color {
         #if os(macOS)
-        Color(nsColor: NSColor.tertiaryLabelColor)
+        Color(nsColor: NSColor.quaternaryLabelColor)
         #else
-        Color(UIColor.tertiaryLabel)
+        Color(UIColor.quaternaryLabel)
         #endif
     }
 
