@@ -22,7 +22,7 @@ struct GoalProgressIndicator: View {
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
-                    isComplete ? Color.green : Color.blue,
+                    isComplete ? Color.green : Color.gray,
                     style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
                 )
                 .frame(width: 16, height: 16)

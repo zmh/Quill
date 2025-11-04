@@ -599,6 +599,9 @@ struct AccountsSettingsView: View {
     let currentSite: SiteConfiguration?
     let testAndSaveConnection: () -> Void
     let disconnectSite: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var isSyncing = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -670,8 +673,24 @@ struct AccountsSettingsView: View {
                         disconnectSite()
                     }
                     .foregroundColor(.red)
+
+                    Button(action: {
+                        refreshPosts()
+                    }) {
+                        HStack(spacing: 4) {
+                            if isSyncing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            Text("Refresh Posts")
+                        }
+                    }
+                    .disabled(isSyncing)
                 }
-                
+
                 Spacer()
                 
                 if isTestingConnection {
@@ -691,6 +710,17 @@ struct AccountsSettingsView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func refreshPosts() {
+        guard let siteConfig = currentSite else { return }
+
+        isSyncing = true
+
+        Task { @MainActor in
+            await SyncManager.shared.syncPosts(siteConfig: siteConfig, modelContext: modelContext)
+            isSyncing = false
+        }
     }
 }
 

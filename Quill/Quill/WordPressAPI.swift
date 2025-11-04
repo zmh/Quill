@@ -560,7 +560,7 @@ class WordPressAPI {
 
         for (index, postID) in postIDs.enumerated() {
             do {
-                let post = try await fetchSinglePost(
+                let post = try await fetchSinglePostInternal(
                     baseURL: baseURL,
                     username: username,
                     password: password,
@@ -718,7 +718,22 @@ class WordPressAPI {
         throw WordPressError.invalidResponse
     }
 
-    private func fetchSinglePost(
+    func fetchSinglePost(
+        siteURL: String,
+        username: String,
+        password: String,
+        postID: Int
+    ) async throws -> WordPressPost {
+        let baseURL = normalizeURL(siteURL)
+        return try await fetchSinglePostInternal(
+            baseURL: baseURL,
+            username: username,
+            password: password,
+            postID: postID
+        )
+    }
+
+    private func fetchSinglePostInternal(
         baseURL: String,
         username: String,
         password: String,
@@ -976,10 +991,11 @@ struct WordPressPost: Codable {
     let modifiedGmt: String
     let slug: String
     let status: String
+    let link: String?
     let title: RenderedContent
     let content: RenderedContent
     let excerpt: RenderedContent
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case date
@@ -988,6 +1004,7 @@ struct WordPressPost: Codable {
         case modifiedGmt = "modified_gmt"
         case slug
         case status
+        case link
         case title
         case content
         case excerpt
