@@ -38,7 +38,8 @@ struct SettingsView: View {
     @AppStorage("writingGoalEnabled") private var writingGoalEnabled = false
     @AppStorage("writingGoalTarget") private var writingGoalTarget = 500
     @AppStorage("writingGoalPeriod") private var writingGoalPeriod = "daily"
-    
+    @AppStorage("newPostTitleFormat") private var newPostTitleFormat = "date"
+
     private var platformBackgroundColor: Color {
         #if os(macOS)
         return Color(NSColor.controlBackgroundColor)
@@ -98,7 +99,8 @@ struct SettingsView: View {
                             editorFontSize: $editorFontSize,
                             writingGoalEnabled: $writingGoalEnabled,
                             writingGoalTarget: $writingGoalTarget,
-                            writingGoalPeriod: $writingGoalPeriod
+                            writingGoalPeriod: $writingGoalPeriod,
+                            newPostTitleFormat: $newPostTitleFormat
                         )
                         .navigationBarHidden(true)
                     }
@@ -115,7 +117,8 @@ struct SettingsView: View {
                             editorFontSize: $editorFontSize,
                             writingGoalEnabled: $writingGoalEnabled,
                             writingGoalTarget: $writingGoalTarget,
-                            writingGoalPeriod: $writingGoalPeriod
+                            writingGoalPeriod: $writingGoalPeriod,
+                            newPostTitleFormat: $newPostTitleFormat
                         )
                         .frame(maxWidth: .infinity)
                     }
@@ -337,7 +340,15 @@ struct GeneralSettingsView: View {
     @Binding var writingGoalEnabled: Bool
     @Binding var writingGoalTarget: Int
     @Binding var writingGoalPeriod: String
-    
+    @Binding var newPostTitleFormat: String
+
+    private var titleFormatDisplayName: String {
+        if let format = PostTitleFormat(rawValue: newPostTitleFormat) {
+            return format.displayName
+        }
+        return "Date (2025-01-15)"
+    }
+
     private var typefaceDisplayName: String {
         switch editorTypeface {
         case "system": return "San Francisco"
@@ -398,6 +409,17 @@ struct GeneralSettingsView: View {
                 Toggle("Show Word Count", isOn: $showWordCount)
                 Toggle("Enable Auto-save", isOn: $enableAutoSave)
                 Toggle("Show Absolute Dates", isOn: $showAbsoluteDates)
+
+                NavigationLink {
+                    TitleFormatPickerView(selection: $newPostTitleFormat)
+                } label: {
+                    HStack {
+                        Text("New Post Title")
+                        Spacer()
+                        Text(titleFormatDisplayName)
+                            .foregroundColor(.secondary)
+                    }
+                }
             } header: {
                 Text("EDITOR")
             }
@@ -471,7 +493,7 @@ struct GeneralSettingsView: View {
                         Spacer()
                     }
                 }
-                
+
                 SettingsRow(label: "") {
                     HStack {
                         Toggle("Enable auto-save", isOn: $enableAutoSave)
@@ -479,11 +501,24 @@ struct GeneralSettingsView: View {
                         Spacer()
                     }
                 }
-                
+
                 SettingsRow(label: "") {
                     HStack {
                         Toggle("Show absolute dates", isOn: $showAbsoluteDates)
                             .toggleStyle(.checkbox)
+                        Spacer()
+                    }
+                }
+
+                SettingsRow(label: "New post title:") {
+                    HStack {
+                        Picker("", selection: $newPostTitleFormat) {
+                            ForEach(PostTitleFormat.allCases, id: \.self) { format in
+                                Text(format.displayName).tag(format.rawValue)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 200)
                         Spacer()
                     }
                 }
@@ -567,7 +602,7 @@ struct GeneralSettingsView: View {
 struct TypefacePickerView: View {
     @Binding var selection: String
     @Environment(\.dismiss) private var dismiss
-    
+
     let typefaces = [
         ("system", "San Francisco"),
         ("sf-mono", "SF Mono"),
@@ -578,7 +613,7 @@ struct TypefacePickerView: View {
         ("verdana", "Verdana"),
         ("arial", "Arial")
     ]
-    
+
     var body: some View {
         Form {
             ForEach(typefaces, id: \.0) { id, name in
@@ -598,6 +633,37 @@ struct TypefacePickerView: View {
             }
         }
         .navigationTitle("Typeface")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+// MARK: - Title Format Picker View
+
+struct TitleFormatPickerView: View {
+    @Binding var selection: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Form {
+            ForEach(PostTitleFormat.allCases, id: \.self) { format in
+                HStack {
+                    Text(format.displayName)
+                    Spacer()
+                    if selection == format.rawValue {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selection = format.rawValue
+                    dismiss()
+                }
+            }
+        }
+        .navigationTitle("New Post Title")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

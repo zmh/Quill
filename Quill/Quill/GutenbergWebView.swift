@@ -85,7 +85,7 @@ struct GutenbergWebView: View {
     
     private func refreshWebViewContent() {
         guard let webView = webViewRef else { return }
-        
+
         // Trigger a refresh of the WebView content with decoded HTML entities
         let decodedContent = HTMLHandler.shared.decodeHTMLEntitiesManually(post.content)
         let script = """
@@ -93,7 +93,7 @@ struct GutenbergWebView: View {
                 window.gutenbergEditor.setContent(`\(decodedContent.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`"))`);
             }
         """
-        
+
         webView.evaluateJavaScript(script) { result, error in
             if let error = error {
                 DebugLogger.shared.log("Failed to refresh WebView content: \(error)", level: .error, source: "WebView")
@@ -130,6 +130,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         configuration.userContentController.add(coordinator, name: "imageUpload")
         configuration.userContentController.add(coordinator, name: "requestImagePicker")
         configuration.userContentController.add(coordinator, name: "consoleLog")
+        configuration.userContentController.add(coordinator, name: "linkClicked")
         
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
@@ -2743,6 +2744,8 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     if let logMessage = message.body as? String {
                         DebugLogger.shared.log("[JS Console] \(logMessage)", level: .debug, source: "WebView")
                     }
+                case "linkClicked":
+                    self.handleLinkClicked(message.body)
                 default:
                     break
                 }
@@ -2852,11 +2855,45 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     }, true);
                     
                     window.webkit.messageHandlers.editorError.postMessage('Added editor-ready Cmd+K listener');
+
+                    // Add click listener for links
+                    document.addEventListener('click', (e) => {
+                        // Check if the clicked element or any parent is a link
+                        let target = e.target;
+                        while (target && target !== document.body) {
+                            if (target.nodeName === 'A' && target.href) {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                // Get the link's text and URL
+                                const linkText = target.textContent;
+                                const linkURL = target.href;
+
+                                // Get the bounding rect for positioning
+                                const rect = target.getBoundingClientRect();
+
+                                // Send message to native app
+                                window.webkit.messageHandlers.linkClicked.postMessage({
+                                    text: linkText,
+                                    url: linkURL,
+                                    x: rect.left,
+                                    y: rect.top,
+                                    width: rect.width,
+                                    height: rect.height
+                                });
+
+                                return false;
+                            }
+                            target = target.parentNode;
+                        }
+                    }, true);
+
+                    window.webkit.messageHandlers.editorError.postMessage('Added link click listener');
                 """
-                
+
                 webView.evaluateJavaScript(script) { _, error in
                     if let error = error {
-                        DebugLogger.shared.log("Failed to add Cmd+K listener: \(error)", level: .error, source: "WebView")
+                        DebugLogger.shared.log("Failed to add event listeners: \(error)", level: .error, source: "WebView")
                     }
                 }
             }
@@ -3231,11 +3268,63 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         private func executeBlockAction(_ action: String, blockIndex: Int) {
             // Get the webView from the parent's webViewRef
             guard let webView = parent.webViewRef else { return }
-            
+
             let script = "window.gutenbergEditor?.\(action)(\(blockIndex))"
             webView.evaluateJavaScript(script) { result, error in
                 if let error = error {
                     DebugLogger.shared.log("Failed to execute block action \(action): \(error)", level: .error, source: "WebView")
+                }
+            }
+        }
+
+        func showHyperlinkDialog(for selectedText: String) {
+            // Get cursor position from the web view
+            guard let webView = parent.webViewRef else { return }
+
+            // Check clipboard for URL
+            var clipboardURL = ""
+            if let clipboardString = UIPasteboard.general.string {
+                // Simple URL detection - check if it starts with http:// or https://
+                if clipboardString.hasPrefix("http://") || clipboardString.hasPrefix("https://") {
+                    clipboardURL = clipboardString
+                }
+            }
+
+            // Get the selection rect from JavaScript
+            let script = """
+                (function() {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        return {
+                            x: rect.left + rect.width / 2,
+                            y: rect.bottom + 10
+                        };
+                    }
+                    return null;
+                })();
+            """
+
+            webView.evaluateJavaScript(script) { [weak self] result, error in
+                guard let self = self else { return }
+
+                DispatchQueue.main.async {
+                    // Default position in center if we can't get selection position
+                    var position = CGPoint(x: 200, y: 300)
+
+                    if let dict = result as? [String: Any],
+                       let x = dict["x"] as? CGFloat,
+                       let y = dict["y"] as? CGFloat {
+                        position = CGPoint(x: x, y: y)
+                    }
+
+                    // Update parent state to show tooltip
+                    self.parent.linkSelectedText = selectedText
+                    self.parent.linkURL = clipboardURL
+                    self.parent.linkTitle = ""
+                    self.parent.tooltipPosition = position
+                    self.parent.showLinkTooltip = true
                 }
             }
         }
@@ -3420,6 +3509,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         configuration.userContentController.add(coordinator, name: "imageUpload")
         configuration.userContentController.add(coordinator, name: "requestImagePicker")
         configuration.userContentController.add(coordinator, name: "consoleLog")
+        configuration.userContentController.add(coordinator, name: "linkClicked")
         
         let webView = GutenbergWKWebView(frame: .zero, configuration: configuration)
         webView.coordinator = coordinator
@@ -5546,7 +5636,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
         private var lastPendingContent: String?
-        
+        private var linkPopover: NSPopover?
+
         init(_ parent: GutenbergWebViewRepresentable) {
             self.parent = parent
         }
@@ -5629,6 +5720,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     if let logMessage = message.body as? String {
                         DebugLogger.shared.log("[JS Console] \(logMessage)", level: .debug, source: "WebView")
                     }
+                case "linkClicked":
+                    self.handleLinkClicked(message.body)
                 default:
                     break
                 }
@@ -5738,11 +5831,45 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     }, true);
                     
                     window.webkit.messageHandlers.editorError.postMessage('Added editor-ready Cmd+K listener');
+
+                    // Add click listener for links
+                    document.addEventListener('click', (e) => {
+                        // Check if the clicked element or any parent is a link
+                        let target = e.target;
+                        while (target && target !== document.body) {
+                            if (target.nodeName === 'A' && target.href) {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                // Get the link's text and URL
+                                const linkText = target.textContent;
+                                const linkURL = target.href;
+
+                                // Get the bounding rect for positioning
+                                const rect = target.getBoundingClientRect();
+
+                                // Send message to native app
+                                window.webkit.messageHandlers.linkClicked.postMessage({
+                                    text: linkText,
+                                    url: linkURL,
+                                    x: rect.left,
+                                    y: rect.top,
+                                    width: rect.width,
+                                    height: rect.height
+                                });
+
+                                return false;
+                            }
+                            target = target.parentNode;
+                        }
+                    }, true);
+
+                    window.webkit.messageHandlers.editorError.postMessage('Added link click listener');
                 """
-                
+
                 webView.evaluateJavaScript(script) { _, error in
                     if let error = error {
-                        DebugLogger.shared.log("Failed to add Cmd+K listener: \(error)", level: .error, source: "WebView")
+                        DebugLogger.shared.log("Failed to add event listeners: \(error)", level: .error, source: "WebView")
                     }
                 }
             }
@@ -5994,51 +6121,242 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             }
         }
         
+        func handleLinkClicked(_ body: Any) {
+            guard let data = body as? [String: Any],
+                  let linkText = data["text"] as? String,
+                  let linkURL = data["url"] as? String,
+                  let x = data["x"] as? CGFloat,
+                  let y = data["y"] as? CGFloat,
+                  let width = data["width"] as? CGFloat,
+                  let height = data["height"] as? CGFloat else {
+                DebugLogger.shared.log("Invalid link clicked data", level: .error, source: "WebView")
+                return
+            }
+
+            guard let webView = parent.webViewRef as? GutenbergWKWebView else { return }
+
+            DebugLogger.shared.log("Link clicked: \(linkURL)", level: .info, source: "WebView")
+
+            DispatchQueue.main.async {
+                // Calculate position rect for the popover
+                // Move up 10px when editing existing link (to account for taller popover with action buttons)
+                let selectionRect = NSRect(
+                    x: x - 30,
+                    y: y + height + 135,
+                    width: max(width, 100),
+                    height: 5
+                )
+
+                // Create the popover
+                let popover = NSPopover()
+                popover.behavior = .transient
+                popover.animates = true
+
+                // Create SwiftUI view for popover content
+                let linkView = LinkPopoverContentView(
+                    selectedText: linkText,
+                    initialURL: linkURL,
+                    onAdd: { [weak self] url, title in
+                        self?.applyHyperlink(url: url, to: linkText)
+                        popover.close()
+                    },
+                    onRemove: { [weak self] in
+                        self?.removeHyperlink()
+                        popover.close()
+                    },
+                    onDismiss: {
+                        popover.close()
+                    }
+                )
+
+                popover.contentViewController = NSHostingController(rootView: linkView)
+
+                // Show the popover below the link
+                popover.show(relativeTo: selectionRect, of: webView, preferredEdge: .minY)
+                self.linkPopover = popover
+            }
+        }
+
         func showHyperlinkDialog(for selectedText: String) {
-            // Create alert for hyperlink URL input
-            let alert = NSAlert()
-            alert.messageText = "Add Link"
-            alert.informativeText = "Enter URL for \"\(selectedText)\""
-            alert.alertStyle = .informational
-            
-            // Create URL input field
-            let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-            inputField.placeholderString = "https://example.com"
-            
+            // Get cursor position from the web view
+            guard let webView = parent.webViewRef as? GutenbergWKWebView else { return }
+
             // Check clipboard for URL
+            var clipboardURL = ""
             if let clipboardString = NSPasteboard.general.string(forType: .string) {
                 // Simple URL detection - check if it starts with http:// or https://
                 if clipboardString.hasPrefix("http://") || clipboardString.hasPrefix("https://") {
-                    inputField.stringValue = clipboardString
+                    clipboardURL = clipboardString
                 }
             }
-            
-            alert.accessoryView = inputField
-            alert.addButton(withTitle: "Add Link")
-            alert.addButton(withTitle: "Cancel")
-            
-            // Make input field first responder
-            alert.window.initialFirstResponder = inputField
-            
-            if alert.runModal() == .alertFirstButtonReturn {
-                let urlString = inputField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                // Validate URL
-                guard !urlString.isEmpty else { return }
-                
-                // Add https:// if no protocol specified
-                let finalURL = urlString.hasPrefix("http://") || urlString.hasPrefix("https://") 
-                    ? urlString 
-                    : "https://\(urlString)"
-                
-                // Apply hyperlink to selected text
-                applyHyperlink(url: finalURL, to: selectedText)
+
+            // Get the selection position and check for existing link from JavaScript
+            let script = """
+                (function() {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+
+                        // Check if selection is within a link
+                        let node = range.commonAncestorContainer;
+                        let linkElement = null;
+                        let existingURL = null;
+
+                        // Walk up the DOM tree to find a link
+                        while (node && node !== document.body) {
+                            if (node.nodeName === 'A') {
+                                linkElement = node;
+                                existingURL = node.href;
+                                break;
+                            }
+                            node = node.parentNode;
+                        }
+
+                        return {
+                            x: rect.left,
+                            y: rect.top,
+                            width: rect.width,
+                            height: rect.height,
+                            existingURL: existingURL
+                        };
+                    }
+                    return null;
+                })();
+            """
+
+            webView.evaluateJavaScript(script) { [weak self] result, error in
+                guard let self = self else { return }
+
+                DispatchQueue.main.async {
+                    var selectionRect = NSRect(x: 100, y: 100, width: 100, height: 20)
+                    var urlToEdit = clipboardURL
+
+                    if let dict = result as? [String: Any],
+                       let x = dict["x"] as? CGFloat,
+                       let y = dict["y"] as? CGFloat,
+                       let width = dict["width"] as? CGFloat,
+                       let height = dict["height"] as? CGFloat {
+
+                        // Check if there's an existing link
+                        if let existingURL = dict["existingURL"] as? String, !existingURL.isEmpty {
+                            urlToEdit = existingURL
+                            DebugLogger.shared.log("Editing existing link: \(existingURL)", level: .info, source: "WebView")
+                        }
+
+                        // WKWebView is flipped (Y=0 at top), so coordinates from JS are already correct
+                        // We just need to use them directly
+                        // Add offset below the selection for better visual positioning
+                        selectionRect = NSRect(
+                            x: x - 30,  // Shift slightly left for better arrow alignment
+                            y: y + height + 145,  // Position below the selection (extra offset for popover arrow)
+                            width: max(width, 100),
+                            height: 5
+                        )
+
+                        DebugLogger.shared.log("Selection rect: x=\(x), y=\(y), w=\(width), h=\(height), isFlipped=\(webView.isFlipped)", level: .debug, source: "WebView")
+                    }
+
+                    // Create the popover
+                    let popover = NSPopover()
+                    popover.behavior = .transient
+                    popover.animates = true
+
+                    // Create SwiftUI view for popover content
+                    let linkView = LinkPopoverContentView(
+                        selectedText: selectedText,
+                        initialURL: urlToEdit,
+                        onAdd: { [weak self] url, title in
+                            self?.applyHyperlink(url: url, to: selectedText)
+                            popover.close()
+                        },
+                        onRemove: { [weak self] in
+                            self?.removeHyperlink()
+                            popover.close()
+                        },
+                        onDismiss: {
+                            popover.close()
+                        }
+                    )
+
+                    popover.contentViewController = NSHostingController(rootView: linkView)
+
+                    // Show the popover below the selection
+                    // Use minY which should show below in a flipped coordinate system
+                    popover.show(relativeTo: selectionRect, of: webView, preferredEdge: .minY)
+                    self.linkPopover = popover
+                }
+            }
+        }
+
+        private func removeHyperlink() {
+            guard let webView = parent.webViewRef else { return }
+
+            let script = """
+                (function() {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        let node = range.commonAncestorContainer;
+
+                        // Find the parent link element
+                        while (node && node !== document.body) {
+                            if (node.nodeName === 'A') {
+                                // Found the link, remove it but keep the text
+                                const parent = node.parentNode;
+                                const textContent = node.textContent;
+                                const textNode = document.createTextNode(textContent);
+
+                                // Replace the link with just the text
+                                parent.replaceChild(textNode, node);
+
+                                // Trigger content update
+                                const container = document.querySelector('.editor-container');
+                                if (container) {
+                                    const html = container.innerHTML;
+                                    window.webkit.messageHandlers.contentUpdate.postMessage({
+                                        html: html,
+                                        text: container.innerText || ''
+                                    });
+                                }
+
+                                return 'removed';
+                            }
+                            node = node.parentNode;
+                        }
+                    }
+                    return 'not found';
+                })();
+            """
+
+            webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    DebugLogger.shared.log("Failed to remove hyperlink: \(error)", level: .error, source: "WebView")
+                } else if let result = result as? String {
+                    DebugLogger.shared.log("Remove hyperlink result: \(result)", level: .info, source: "WebView")
+                }
             }
         }
         
         private func applyHyperlink(url: String, to selectedText: String) {
             guard let webView = parent.webViewRef else { return }
-            
+
+            // Add https:// if no scheme is provided
+            var finalURL = url.trimmingCharacters(in: .whitespaces)
+            if !finalURL.isEmpty && !finalURL.hasPrefix("http://") && !finalURL.hasPrefix("https://") {
+                finalURL = "https://\(finalURL)"
+            }
+
+            // Properly escape strings for JavaScript using JSON encoding
+            let urlJSON = try? JSONEncoder().encode(finalURL)
+            let textJSON = try? JSONEncoder().encode(selectedText)
+
+            guard let urlString = urlJSON.flatMap({ String(data: $0, encoding: .utf8) }),
+                  let textString = textJSON.flatMap({ String(data: $0, encoding: .utf8) }) else {
+                DebugLogger.shared.log("Failed to encode URL or text for JavaScript", level: .error, source: "WebView")
+                return
+            }
+
             // JavaScript to wrap selection in a link and notify content update
             let script = """
                 (function() {
@@ -6046,8 +6364,8 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
                         const link = document.createElement('a');
-                        link.href = '\(url.replacingOccurrences(of: "'", with: "\\'"))';
-                        link.textContent = '\(selectedText.replacingOccurrences(of: "'", with: "\\'"))';
+                        link.href = \(urlString);
+                        link.textContent = \(textString);
                         
                         range.deleteContents();
                         range.insertNode(link);
@@ -6079,6 +6397,124 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 } else {
                     DebugLogger.shared.log("Successfully applied hyperlink to text: \(selectedText)", level: .info, source: "WebView")
                 }
+            }
+        }
+    }
+}
+#endif
+
+// MARK: - Link Popover Content View
+
+#if os(macOS)
+struct LinkPopoverContentView: View {
+    let selectedText: String
+    let initialURL: String
+    let onAdd: (String, String?) -> Void
+    let onRemove: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var url: String
+    @State private var title: String = ""
+    @FocusState private var isURLFieldFocused: Bool
+
+    init(selectedText: String, initialURL: String, onAdd: @escaping (String, String?) -> Void, onRemove: @escaping () -> Void, onDismiss: @escaping () -> Void) {
+        self.selectedText = selectedText
+        self.initialURL = initialURL
+        self.onAdd = onAdd
+        self.onRemove = onRemove
+        self.onDismiss = onDismiss
+        _url = State(initialValue: initialURL)
+    }
+
+    private func openLink() {
+        // Ensure URL has protocol
+        var urlToOpen = url.trimmingCharacters(in: .whitespaces)
+        if !urlToOpen.isEmpty && !urlToOpen.hasPrefix("http://") && !urlToOpen.hasPrefix("https://") {
+            urlToOpen = "https://\(urlToOpen)"
+        }
+
+        if let url = URL(string: urlToOpen) {
+            NSWorkspace.shared.open(url)
+            onDismiss()
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // URL input field
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Link to")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                TextField("URL or Heading", text: $url)
+                    .textFieldStyle(.plain)
+                    .focused($isURLFieldFocused)
+                    .font(.system(size: 13))
+                    .onSubmit {
+                        if !url.isEmpty {
+                            onAdd(url, title.isEmpty ? nil : title)
+                        }
+                    }
+                .padding(8)
+                .background(Color(nsColor: .textBackgroundColor))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.accentColor, lineWidth: 1.5)
+                )
+            }
+
+            // Title input field (optional)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Title")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                TextField("Optional", text: $title)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .padding(8)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .cornerRadius(6)
+                    .onSubmit {
+                        if !url.isEmpty {
+                            onAdd(url, title.isEmpty ? nil : title)
+                        }
+                    }
+            }
+
+            // Action buttons (only show if editing an existing link)
+            if !initialURL.isEmpty {
+                HStack(spacing: 12) {
+                    Button(action: {
+                        openLink()
+                    }) {
+                        Text("Open Link")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Button(action: {
+                        onRemove()
+                    }) {
+                        Text("Remove Link")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
+        .onAppear {
+            // Auto-focus the URL field when popover appears
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isURLFieldFocused = true
             }
         }
     }

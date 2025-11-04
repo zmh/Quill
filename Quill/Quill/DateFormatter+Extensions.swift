@@ -7,6 +7,20 @@
 
 import Foundation
 
+// MARK: - Post Title Format
+
+enum PostTitleFormat: String, CaseIterable {
+    case yearMonthDay = "date"
+    case none = "none"
+
+    var displayName: String {
+        switch self {
+        case .yearMonthDay: return "Date (2025-01-15)"
+        case .none: return "No title"
+        }
+    }
+}
+
 extension Date {
     func simplifiedRelativeString() -> String {
         let now = Date()
@@ -54,6 +68,21 @@ extension Date {
         } else {
             let years = Int(interval / 31536000)
             return "\(years) year\(years == 1 ? "" : "s") ago"
+        }
+    }
+
+    func toYearMonthDayString() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: self)
+    }
+
+    func toPostTitle(format: PostTitleFormat) -> String {
+        switch format {
+        case .yearMonthDay:
+            return toYearMonthDayString()
+        case .none:
+            return ""
         }
     }
 }
