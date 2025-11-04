@@ -67,6 +67,7 @@ else
         CODE_SIGN_IDENTITY="Developer ID Application: Clay Software, Inc. (C68GA48KN3)" \
         DEVELOPMENT_TEAM="C68GA48KN3" \
         ENABLE_HARDENED_RUNTIME=YES \
+        LD_RUNPATH_SEARCH_PATHS="@executable_path/../Frameworks" \
         -allowProvisioningUpdates
 fi
 
