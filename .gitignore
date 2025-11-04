@@ -120,5 +120,17 @@ Temporary Items
 *.profraw
 default.profraw
 
+# Distribution artifacts
+*.dmg
+*.pkg
+*.app.zip
+*.sha256
+release_notes.md
+
+# Sparkle signing keys (IMPORTANT: Never commit private keys!)
+dsa_priv.pem
+ed25519_priv.pem
+sparkle_private_key
+
 # Claude settings (optional - remove this line if you want to track Claude settings)
 .claude/settings.local.json

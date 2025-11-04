@@ -60,6 +60,15 @@ struct QuillApp: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
+
+            #if os(macOS)
+            // Add Check for Updates menu item
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    AppUpdater.shared.checkForUpdates()
+                }
+            }
+            #endif
         }
 
         #if os(macOS)

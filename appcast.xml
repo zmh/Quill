@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+    <channel>
+        <title>Quill Updates</title>
+        <description>Most recent updates to Quill</description>
+        <language>en</language>
+        <link>https://github.com/zmh/quill/releases</link>
+
+        <!--
+        UPDATE INSTRUCTIONS:
+        1. After creating a GitHub release, download the appcast.xml artifact
+        2. Copy the generated <item> block below
+        3. Commit and push this file to enable automatic updates
+
+        For EdDSA signatures (recommended for production):
+        - Generate signing keys: https://sparkle-project.org/documentation/
+        - Add sparkle:edSignature attribute to enclosure
+        - Keep private key secure (use GitHub Secrets for CI/CD)
+        -->
+
+        <item>
+            <title>Version 1.0.2</title>
+            <pubDate>Mon, 04 Nov 2025 00:00:00 +0000</pubDate>
+            <sparkle:version>1.0.2</sparkle:version>
+            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.2</h2>
+                <ul>
+                    <li>Smart Preferences tab selection: Accounts tab shown for new users, General tab for existing users</li>
+                    <li>Bug fixes and performance improvements</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/quill/releases/download/v1.0.2/Quill-1.0.2.dmg"
+                length="3603974"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
+            <title>Version 1.0.0</title>
+            <pubDate>Mon, 04 Nov 2024 00:00:00 +0000</pubDate>
+            <sparkle:version>1.0.0</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.0</h2>
+                <ul>
+                    <li>Initial release of Quill</li>
+                    <li>Native WordPress editor for macOS</li>
+                    <li>Offline-first with local SwiftData storage</li>
+                    <li>Support for Gutenberg blocks</li>
+                    <li>Automatic updates via Sparkle</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/quill/releases/download/v1.0.0/Quill-1.0.0.dmg"
+                length="0"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+    </channel>
+</rss>
