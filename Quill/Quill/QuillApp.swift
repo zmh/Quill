@@ -43,6 +43,11 @@ struct QuillApp: App {
         }
     }()
 
+    init() {
+        // Load custom fonts on app launch
+        FontLoader.shared.loadFonts()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
