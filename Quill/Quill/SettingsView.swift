@@ -1081,7 +1081,7 @@ struct AboutSettingsView: View {
                 .fontWeight(.semibold)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Version 1.0.0")
+                Text("Version 1.0.3")
                     .foregroundColor(.secondary)
 
                 Text("A beautiful, native, distraction-free WordPress editor for Mac")
