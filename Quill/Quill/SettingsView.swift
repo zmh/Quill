@@ -556,6 +556,9 @@ struct TypefacePickerView: View {
     let typefaces = [
         ("system", "San Francisco"),
         ("sf-mono", "SF Mono"),
+        ("ia-mono", "iA Writer Mono"),
+        ("ia-duo", "iA Writer Duo"),
+        ("ia-quattro", "iA Writer Quattro"),
         ("georgia", "Georgia"),
         ("verdana", "Verdana"),
         ("arial", "Arial")

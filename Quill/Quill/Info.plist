@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/iA Writer Mono/iAWriterMonoS-Regular.ttf</string>
+		<string>Fonts/iA Writer Mono/iAWriterMonoS-Bold.ttf</string>
+		<string>Fonts/iA Writer Mono/iAWriterMonoS-Italic.ttf</string>
+		<string>Fonts/iA Writer Mono/iAWriterMonoS-BoldItalic.ttf</string>
+		<string>Fonts/iA Writer Duo/iAWriterDuoS-Regular.ttf</string>
+		<string>Fonts/iA Writer Duo/iAWriterDuoS-Bold.ttf</string>
+		<string>Fonts/iA Writer Duo/iAWriterDuoS-Italic.ttf</string>
+		<string>Fonts/iA Writer Duo/iAWriterDuoS-BoldItalic.ttf</string>
+		<string>Fonts/iA Writer Quattro/iAWriterQuattroS-Regular.ttf</string>
+		<string>Fonts/iA Writer Quattro/iAWriterQuattroS-Bold.ttf</string>
+		<string>Fonts/iA Writer Quattro/iAWriterQuattroS-Italic.ttf</string>
+		<string>Fonts/iA Writer Quattro/iAWriterQuattroS-BoldItalic.ttf</string>
+	</array>
+</dict>
+</plist>
