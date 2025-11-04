@@ -50,6 +50,16 @@ class FontLoader {
         }
 
         print("✅ Successfully registered font: \(name)")
+
+        // Get and print the actual font name from the file
+        if let fontDescriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] {
+            for descriptor in fontDescriptors {
+                if let familyName = CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute) as? String,
+                   let postScriptName = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String {
+                    print("   → Family: '\(familyName)' | PostScript: '\(postScriptName)'")
+                }
+            }
+        }
     }
 
     func listAvailableFonts() {
