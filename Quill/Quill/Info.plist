@@ -2,15 +2,35 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- App Identity -->
+	<key>CFBundleIdentifier</key>
+	<string>zacharyhamed.Quill</string>
+	<key>CFBundleName</key>
+	<string>Quill</string>
+	<key>CFBundleDisplayName</key>
+	<string>Quill</string>
+	<key>CFBundleExecutable</key>
+	<string>Quill</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+
+	<!-- App Category -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+
+	<!-- Minimum OS Version -->
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+
 	<!-- Sparkle Update Configuration -->
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/zmh/quill/main/appcast.xml</string>
-
-	<!-- Enable automatic update checking -->
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
-
-	<!-- Check for updates daily (86400 seconds = 24 hours) -->
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 
