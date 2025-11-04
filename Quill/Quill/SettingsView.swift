@@ -68,6 +68,9 @@ struct SettingsView: View {
                 TabButton(title: "Accounts", icon: "at", isSelected: selectedTab == "accounts") {
                     selectedTab = "accounts"
                 }
+                TabButton(title: "About", icon: "info.circle", isSelected: selectedTab == "about") {
+                    selectedTab = "about"
+                }
                 TabButton(title: "Debug", icon: "ladybug", isSelected: selectedTab == "debug") {
                     selectedTab = "debug"
                 }
@@ -145,6 +148,12 @@ struct SettingsView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
+                    }
+                    .background(Color(platformBackgroundColor))
+                case "about":
+                    ScrollView {
+                        AboutSettingsView()
+                            .frame(maxWidth: .infinity)
                     }
                     .background(Color(platformBackgroundColor))
                 case "debug":
@@ -985,6 +994,52 @@ struct SiteURLTextField: UIViewRepresentable {
     }
 }
 #endif
+
+// MARK: - About Settings View
+
+struct AboutSettingsView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("About Quill")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Version 1.0.0")
+                    .foregroundColor(.secondary)
+
+                Text("A native WordPress editor for Mac and iOS")
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+                .padding(.vertical, 10)
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Open Source Acknowledgements")
+                    .font(.headline)
+
+                // iA Writer Fonts
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("iA Writer Fonts")
+                        .fontWeight(.medium)
+
+                    Text("Monospace, Duospace and Quattro typefaces")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Link("github.com/iaolo/iA-Fonts", destination: URL(string: "https://github.com/iaolo/iA-Fonts")!)
+                        .font(.caption)
+                }
+                .padding(.vertical, 4)
+            }
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
 
 #Preview {
     SettingsView()
