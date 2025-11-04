@@ -8,6 +8,104 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Post Filter
+enum PostFilter: String, CaseIterable, Identifiable {
+    case all
+    case local
+    case draft
+    case scheduled
+    case published
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .all: return "All"
+        case .local: return "Local"
+        case .draft: return "Draft"
+        case .published: return "Published"
+        case .scheduled: return "Scheduled"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .all: return "tray"
+        case .local: return "laptopcomputer"
+        case .draft: return "doc.text"
+        case .published: return "checkmark.circle"
+        case .scheduled: return "clock"
+        }
+    }
+
+    var iconNameFilled: String {
+        switch self {
+        case .all: return "tray.fill"
+        case .local: return "laptopcomputer"
+        case .draft: return "doc.text.fill"
+        case .published: return "checkmark.circle.fill"
+        case .scheduled: return "clock.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .all: return .blue
+        case .local: return .orange
+        case .draft: return .secondary
+        case .published: return .green
+        case .scheduled: return .blue
+        }
+    }
+}
+
+// MARK: - Mail Style Segmented Control
+struct MailStyleSegmentedControl: View {
+    @Binding var selection: PostFilter
+    @Namespace private var animation
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(PostFilter.allCases) { filter in
+                Button(action: {
+                    withAnimation(.snappy(duration: 0.25)) {
+                        selection = filter
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: selection == filter ? filter.iconNameFilled : filter.iconName)
+                            .font(.system(size: 14))
+
+                        if selection == filter {
+                            Text(filter.displayName)
+                                .font(.system(size: 13, weight: .medium))
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                    removal: .scale(scale: 0.8).combined(with: .opacity)
+                                ))
+                        }
+                    }
+                    .padding(.horizontal, selection == filter ? 12 : 8)
+                    .padding(.vertical, 6)
+                    .background {
+                        if selection == filter {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(filter.color)
+                                .matchedGeometryEffect(id: "activeFilter", in: animation)
+                        } else {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.secondary.opacity(0.1))
+                        }
+                    }
+                    .foregroundStyle(selection == filter ? .white : .secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var posts: [Post]
@@ -15,7 +113,7 @@ struct ContentView: View {
 
     @State private var selectedPostIDs: Set<UUID> = []
     @State private var searchText = ""
-    @State private var filterStatus: PostStatus? = nil
+    @State private var filterStatus: PostFilter = .all
     @State private var showingCompose = false
     @State private var showingSettings = false
     @State private var selectedTab = 0
@@ -183,7 +281,7 @@ struct PostsListView: View {
     let posts: [Post]
     @Binding var selectedPostIDs: Set<UUID>
     @Binding var searchText: String
-    @Binding var filterStatus: PostStatus?
+    @Binding var filterStatus: PostFilter
     let syncManager: SyncManager
     let modelContext: ModelContext
     let siteConfig: SiteConfiguration?
@@ -195,14 +293,33 @@ struct PostsListView: View {
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
-    
+
     var filteredPosts: [Post] {
         posts
             .filter { post in
-                (filterStatus == nil || post.status == filterStatus) &&
-                (searchText.isEmpty || 
-                 post.title.localizedCaseInsensitiveContains(searchText) ||
-                 HTMLHandler.shared.htmlToPlainText(post.content).localizedCaseInsensitiveContains(searchText))
+                let matchesFilter: Bool
+                switch filterStatus {
+                case .all:
+                    matchesFilter = true
+                case .local:
+                    // Local posts are those without a remoteID
+                    matchesFilter = post.remoteID == nil
+                case .draft:
+                    // Draft posts are synced posts in draft status
+                    matchesFilter = post.remoteID != nil && post.status == .draft
+                case .published:
+                    // Published posts must be synced
+                    matchesFilter = post.remoteID != nil && post.status == .published
+                case .scheduled:
+                    // Scheduled posts must be synced
+                    matchesFilter = post.remoteID != nil && post.status == .scheduled
+                }
+
+                let matchesSearch = searchText.isEmpty ||
+                    post.title.localizedCaseInsensitiveContains(searchText) ||
+                    HTMLHandler.shared.htmlToPlainText(post.content).localizedCaseInsensitiveContains(searchText)
+
+                return matchesFilter && matchesSearch
             }
             .sorted { post1, post2 in
                 // Sort by display date (published date for published posts, created date for drafts)
@@ -224,16 +341,10 @@ struct PostsListView: View {
             .padding(.vertical, 8)
             
             // Status Filter
-            Picker("", selection: $filterStatus) {
-                Text("All").tag(PostStatus?.none)
-                ForEach(PostStatus.allCases, id: \.self) { status in
-                    Text(status.displayName).tag(PostStatus?.some(status))
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .padding(.bottom, 4)
+            MailStyleSegmentedControl(selection: $filterStatus)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .padding(.bottom, 4)
             
             // Posts List
             List(selection: $selectedPostIDs) {
@@ -441,22 +552,30 @@ struct PostsListView: View {
 struct PostRowView: View {
     let post: Post
     @AppStorage("showAbsoluteDates") private var showAbsoluteDates = false
-    
+
+    private var statusText: String {
+        post.remoteID == nil ? "Local" : post.status.displayName
+    }
+
+    private var statusColor: Color {
+        post.remoteID == nil ? .orange : post.status.color
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(post.titlePlainText.isEmpty ? "Untitled" : post.titlePlainText)
                     .font(.body)
                     .lineLimit(2)
-                
+
                 Spacer()
-                
-                Text(post.status.displayName)
+
+                Text(statusText)
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(post.status.color.opacity(0.2))
-                    .foregroundColor(post.status.color)
+                    .background(statusColor.opacity(0.2))
+                    .foregroundColor(statusColor)
                     .cornerRadius(4)
             }
             
