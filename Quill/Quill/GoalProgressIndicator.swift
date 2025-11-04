@@ -45,10 +45,12 @@ struct GoalProgressButton: View {
     @Query(sort: \WritingSession.date, order: .reverse) private var sessions: [WritingSession]
     @AppStorage("writingGoalTarget") private var writingGoalTarget = 500
     @AppStorage("writingGoalPeriod") private var writingGoalPeriod = "daily"
+    @Environment(\.scenePhase) private var scenePhase
 
     @Binding var showGoalProgress: Bool
     @State private var displayProgress: Double = 0.0
     @State private var displayWordCount: Int = 0
+    @State private var currentDay: Date = Calendar.current.startOfDay(for: Date())
 
     private let goalManager = WritingGoalManager.shared
 
@@ -72,6 +74,16 @@ struct GoalProgressButton: View {
         .task(id: sessions.first?.wordsWritten) {
             // Update whenever the most recent session's word count changes
             updateProgress()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            // Check for day changes when app becomes active
+            if newPhase == .active {
+                let today = Calendar.current.startOfDay(for: Date())
+                if today != currentDay {
+                    currentDay = today
+                    updateProgress()
+                }
+            }
         }
         .onChange(of: writingGoalTarget) { _, _ in
             updateProgress()
