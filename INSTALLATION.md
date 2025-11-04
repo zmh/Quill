@@ -22,19 +22,30 @@ Quill is a native WordPress editor for macOS that provides a distraction-free wr
 3. **Eject the Quill disk image** from Finder
 4. **Open Quill** from your Applications folder
 
-### First Launch
+### First Launch - IMPORTANT
 
-When you first open Quill, macOS may show a warning because it's downloaded from the internet:
+**macOS will show a security warning** when you first open Quill. This is normal for apps downloaded outside the Mac App Store.
 
-1. If you see "Quill cannot be opened because it is from an unidentified developer":
-   - Open **System Settings** → **Privacy & Security**
-   - Scroll down to the Security section
-   - Click **"Open Anyway"** next to the Quill message
-   - Click **"Open"** in the confirmation dialog
+You may see: *"Apple could not verify Quill is free of malware"*
 
-2. Or right-click on Quill and select **"Open"**, then click **"Open"** in the dialog
+**Solution (choose one):**
 
-This is a standard macOS security feature for apps downloaded outside the Mac App Store.
+**Option 1: Right-Click Method** (Easiest)
+1. **Right-click** (or Control-click) on Quill in Applications
+2. Select **"Open"**
+3. Click **"Open"** in the security dialog
+4. The app will launch - this only needs to be done once!
+
+**Option 2: System Settings Method**
+1. Try to open Quill normally
+2. Open **System Settings** → **Privacy & Security**
+3. Scroll down to the Security section
+4. Click **"Open Anyway"** next to the Quill message
+5. Click **"Open"** in the confirmation dialog
+
+**After this first-time setup, Quill will open normally with a double-click.**
+
+> **Why does this happen?** The v1.0.0 release is unsigned/unnotarized to keep it free and accessible. Future versions may include Apple notarization for a smoother experience. The app is safe - you can verify the source code and build process on GitHub.
 
 ## Automatic Updates
 
