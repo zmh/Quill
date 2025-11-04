@@ -18,7 +18,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var siteConfigs: [SiteConfiguration]
     
-    @State private var selectedTab = "general"
+    @State private var selectedTab = ""
     @State private var siteURL = ""
     @State private var username = ""
     @State private var password = ""
@@ -177,6 +177,12 @@ struct SettingsView: View {
             .background(platformBackgroundColor)
         }
         .background(Color(platformBackgroundColor))
+        .onAppear {
+            // Set initial tab based on whether user has accounts
+            if selectedTab.isEmpty {
+                selectedTab = siteConfigs.isEmpty ? "accounts" : "general"
+            }
+        }
         #if os(macOS)
         .frame(width: 500, height: 400)
         .toolbar {
