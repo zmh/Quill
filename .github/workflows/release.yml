@@ -16,7 +16,10 @@ jobs:
         with:
           fetch-depth: 0  # Full history for changelog generation
 
-      # Use default Xcode on runner (15.4 for macos-14)
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.1'  # Project format 77 requires Xcode 16+
 
       - name: Extract version from tag
         id: version
