@@ -112,6 +112,7 @@
 			);
 			name = Quill;
 			packageProductDependencies = (
+				FBE620F26B9A6A38D165B0C1 /* Sparkle */,
 			);
 			productName = Quill;
 			productReference = 8444F6A02DEB50FA002F0BEA /* Quill.app */;
@@ -165,6 +166,25 @@
 		};
 /* End PBXNativeTarget section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		EC3A59F15EA768F1311B2A22 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FBE620F26B9A6A38D165B0C1 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC3A59F15EA768F1311B2A22 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+
 /* Begin PBXProject section */
 		8444F6982DEB50FA002F0BEA /* Project object */ = {
 			isa = PBXProject;
@@ -195,6 +215,9 @@
 			);
 			mainGroup = 8444F6972DEB50FA002F0BEA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EC3A59F15EA768F1311B2A22 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8444F6A12DEB50FA002F0BEA /* Products */;
 			projectDirPath = "";
@@ -400,7 +423,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 86G95Q55DC;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Quill/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -433,7 +457,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 86G95Q55DC;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Quill/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -482,7 +507,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2LPS95N95U;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Quill/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = zacharyhamed.QuillTests;
@@ -517,7 +543,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2LPS95N95U;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Quill/Info.plist;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = zacharyhamed.QuillUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -543,7 +570,8 @@
 		8444F6C32DEB50FD002F0BEA /* Build configuration list for PBXNativeTarget "Quill" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8444F6C42DEB50FD002F0BEA /* Debug */,
+				8444F6C42DEB50FD002F0BEA /* Debug
+				INFOPLIST_FILE = Quill/Info.plist; */,
 				8444F6C52DEB50FD002F0BEA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
