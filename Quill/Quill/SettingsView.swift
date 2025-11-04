@@ -1084,8 +1084,13 @@ struct AboutSettingsView: View {
                 Text("Version 1.0.0")
                     .foregroundColor(.secondary)
 
-                Text("A native WordPress editor for Mac and iOS")
+                Text("A beautiful, native, distraction-free WordPress editor for Mac")
                     .foregroundColor(.secondary)
+
+                Text("Independent project, not affiliated with WordPress or Automattic")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
             }
 
             Divider()
