@@ -333,6 +333,9 @@ struct GeneralSettingsView: View {
         switch editorTypeface {
         case "system": return "San Francisco"
         case "sf-mono": return "SF Mono"
+        case "ia-mono": return "iA Writer Mono"
+        case "ia-duo": return "iA Writer Duo"
+        case "ia-quattro": return "iA Writer Quattro"
         case "georgia": return "Georgia"
         case "verdana": return "Verdana"
         case "arial": return "Arial"
@@ -484,6 +487,9 @@ struct GeneralSettingsView: View {
                         Picker("", selection: $editorTypeface) {
                             Text("San Francisco").tag("system")
                             Text("SF Mono").tag("sf-mono")
+                            Text("iA Writer Mono").tag("ia-mono")
+                            Text("iA Writer Duo").tag("ia-duo")
+                            Text("iA Writer Quattro").tag("ia-quattro")
                             Text("Georgia").tag("georgia")
                             Text("Verdana").tag("verdana")
                             Text("Arial").tag("arial")
@@ -556,6 +562,9 @@ struct TypefacePickerView: View {
     let typefaces = [
         ("system", "San Francisco"),
         ("sf-mono", "SF Mono"),
+        ("ia-mono", "iA Writer Mono"),
+        ("ia-duo", "iA Writer Duo"),
+        ("ia-quattro", "iA Writer Quattro"),
         ("georgia", "Georgia"),
         ("verdana", "Verdana"),
         ("arial", "Arial")
