@@ -19,6 +19,26 @@
         -->
 
         <item>
+            <title>Version 1.0.2</title>
+            <pubDate>Mon, 04 Nov 2025 00:00:00 +0000</pubDate>
+            <sparkle:version>1.0.2</sparkle:version>
+            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.2</h2>
+                <ul>
+                    <li>Smart Preferences tab selection: Accounts tab shown for new users, General tab for existing users</li>
+                    <li>Bug fixes and performance improvements</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/quill/releases/download/v1.0.2/Quill-1.0.2.dmg"
+                length="3603974"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.0</title>
             <pubDate>Mon, 04 Nov 2024 00:00:00 +0000</pubDate>
             <sparkle:version>1.0.0</sparkle:version>
