@@ -49,17 +49,7 @@ xcodebuild archive \
     CODE_SIGN_STYLE=Automatic \
     CODE_SIGN_IDENTITY="Apple Development" \
     DEVELOPMENT_TEAM="86G95Q55DC" \
-    | xcpretty || xcodebuild archive \
-    -project "$XCODE_PROJECT" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -archivePath "$ARCHIVE_PATH" \
-    -destination "generic/platform=macOS" \
-    MARKETING_VERSION="$VERSION" \
-    CURRENT_PROJECT_VERSION="$VERSION" \
-    CODE_SIGN_STYLE=Automatic \
-    CODE_SIGN_IDENTITY="Apple Development" \
-    DEVELOPMENT_TEAM="86G95Q55DC"
+    -allowProvisioningUpdates
 
 # Create export options plist
 echo -e "\n${BLUE}→${NC} Creating export options..."
@@ -88,10 +78,7 @@ xcodebuild -exportArchive \
     -archivePath "$ARCHIVE_PATH" \
     -exportPath "$EXPORT_PATH" \
     -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist" \
-    | xcpretty || xcodebuild -exportArchive \
-    -archivePath "$ARCHIVE_PATH" \
-    -exportPath "$EXPORT_PATH" \
-    -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist"
+    -allowProvisioningUpdates
 
 # Verify the build
 if [ -d "$EXPORT_PATH/$APP_NAME" ]; then

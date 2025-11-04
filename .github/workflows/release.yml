@@ -28,11 +28,6 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Install dependencies
-        run: |
-          # Install xcpretty for prettier build output
-          gem install xcpretty
-
       - name: Build Release
         run: |
           chmod +x Scripts/build-release.sh
