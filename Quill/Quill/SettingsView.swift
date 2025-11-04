@@ -72,9 +72,11 @@ struct SettingsView: View {
                 TabButton(title: "About", icon: "info.circle", isSelected: selectedTab == "about") {
                     selectedTab = "about"
                 }
+                #if DEBUG
                 TabButton(title: "Debug", icon: "ladybug", isSelected: selectedTab == "debug") {
                     selectedTab = "debug"
                 }
+                #endif
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -159,6 +161,7 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .background(Color(platformBackgroundColor))
+                #if DEBUG
                 case "debug":
                     ScrollView {
                         DebugView()
@@ -166,6 +169,7 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .background(Color(platformBackgroundColor))
+                #endif
                 default:
                     EmptyView()
                 }

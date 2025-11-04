@@ -8,11 +8,13 @@
 import Foundation
 import Darwin
 
-class WordPressAPI {
+class WordPressAPI: NSObject, URLSessionDelegate {
     static let shared = WordPressAPI()
-    private init() {}
-    
-    private var session: URLSession = {
+    private override init() {
+        super.init()
+    }
+
+    private lazy var session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
@@ -20,13 +22,41 @@ class WordPressAPI {
         config.httpCookieAcceptPolicy = .never
         config.httpCookieStorage = nil
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        return URLSession(configuration: config)
+        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
+
+    // MARK: - SSL/TLS Certificate Validation
+
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // For HTTPS connections, evaluate the server trust
+        // This ensures we're using proper SSL/TLS and rejecting invalid certificates
+        let policies = [SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)]
+        SecTrustSetPolicies(serverTrust, policies as CFArray)
+
+        var error: CFError?
+        let isValid = SecTrustEvaluateWithError(serverTrust, &error)
+
+        if isValid {
+            let credential = URLCredential(trust: serverTrust)
+            completionHandler(.useCredential, credential)
+            DebugLogger.shared.log("SSL certificate validation passed for \(challenge.protectionSpace.host)", level: .debug, source: "WordPressAPI")
+        } else {
+            DebugLogger.shared.log("SSL certificate validation FAILED for \(challenge.protectionSpace.host): \(error?.localizedDescription ?? "unknown error")", level: .error, source: "WordPressAPI")
+            completionHandler(.cancelAuthenticationChallenge, nil)
+        }
+    }
 
     // MARK: - Authentication
     
     func testConnection(siteURL: String, username: String, password: String) async throws -> Bool {
         let baseURL = normalizeURL(siteURL)
+        try validateURL(baseURL)
         let endpoint = "\(baseURL)/wp-json/wp/v2/users/me"
         
         guard let url = URL(string: endpoint) else {
@@ -80,7 +110,7 @@ class WordPressAPI {
         if let credentialData = credentials.data(using: .utf8) {
             let base64Credentials = credentialData.base64EncodedString()
             request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
-            DebugLogger.shared.log("Authorization header added for user: \(username)", level: .debug, source: "WordPressAPI")
+            DebugLogger.shared.log("Authorization header added", level: .debug, source: "WordPressAPI")
         }
         
         // Create multipart form data
@@ -121,23 +151,14 @@ class WordPressAPI {
                 DebugLogger.shared.log("Image uploaded successfully! Media ID: \(media.id), URL: \(media.sourceUrl)", level: .info, source: "WordPressAPI")
                 return media
             } catch {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    DebugLogger.shared.log("Raw media response: \(responseString)", level: .debug, source: "WordPressAPI")
-                    print("Raw media response: \(responseString)")
-                }
-                DebugLogger.shared.log("Media decoding error: \(error)", level: .error, source: "WordPressAPI")
-                print("Media decoding error: \(error)")
+                DebugLogger.shared.log("Media decoding error: \(error.localizedDescription)", level: .error, source: "WordPressAPI")
                 throw WordPressError.decodingError
             }
         } else if httpResponse.statusCode == 401 {
             DebugLogger.shared.log("Unauthorized - check username and password", level: .error, source: "WordPressAPI")
             throw WordPressError.unauthorized
         } else {
-            // Print error response for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
-                DebugLogger.shared.log("Media upload error response: \(responseString)", level: .error, source: "WordPressAPI")
-                print("Media upload error response: \(responseString)")
-            }
+            DebugLogger.shared.log("Media upload failed with status: \(httpResponse.statusCode)", level: .error, source: "WordPressAPI")
             throw WordPressError.httpError(statusCode: httpResponse.statusCode)
         }
     }
@@ -178,7 +199,6 @@ class WordPressAPI {
         DebugLogger.shared.log("Post ID: \(post.remoteID ?? 0)", level: .info, source: "WordPressAPI")
         DebugLogger.shared.log("Title: \(post.title)", level: .info, source: "WordPressAPI")
         DebugLogger.shared.log("Content length: \(post.content.count) characters", level: .info, source: "WordPressAPI")
-        DebugLogger.shared.log("Content preview: \(String(post.content.prefix(500)))", level: .debug, source: "WordPressAPI")
         
         // Check for potential issues
         if post.content.contains("\\n") {
@@ -209,12 +229,6 @@ class WordPressAPI {
         if httpResponse.statusCode == 201 || httpResponse.statusCode == 200 {
             if httpResponse.statusCode == 200 {
                 DebugLogger.shared.log("Received HTTP 200 on post creation; treating as success", level: .warning, source: "WordPressAPI")
-            }
-
-            // Log the raw response for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
-                DebugLogger.shared.log("Raw create post response: \(String(responseString.prefix(500)))", level: .debug, source: "WordPressAPI")
-                print("📥 Raw create post response: \(responseString)")
             }
 
             // First check if this is actually a WordPress error response (they sometimes return HTTP 200 with errors)
@@ -272,24 +286,17 @@ class WordPressAPI {
                     }
                 }
 
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("❌ Failed to decode create post response: \(responseString)")
-                    DebugLogger.shared.log("Failed to decode create post response: \(responseString)", level: .error, source: "WordPressAPI")
-                }
-                print("❌ Post creation decoding error: \(error)")
-                DebugLogger.shared.log("Post creation decoding error: \(error)", level: .error, source: "WordPressAPI")
+                DebugLogger.shared.log("Post creation decoding error: \(error.localizedDescription)", level: .error, source: "WordPressAPI")
                 throw WordPressError.decodingError
             }
         } else if httpResponse.statusCode == 401 {
             throw WordPressError.unauthorized
         } else {
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Post creation error response: \(responseString)")
-            }
+            DebugLogger.shared.log("Post creation failed with status: \(httpResponse.statusCode)", level: .error, source: "WordPressAPI")
             throw WordPressError.httpError(statusCode: httpResponse.statusCode)
         }
     }
-    
+
     func updatePost(siteURL: String, username: String, password: String, post: Post) async throws -> WordPressPost {
         guard let remoteID = post.remoteID else {
             throw WordPressError.missingRemoteID
@@ -328,7 +335,6 @@ class WordPressAPI {
         DebugLogger.shared.log("Post ID: \(post.remoteID ?? 0)", level: .info, source: "WordPressAPI")
         DebugLogger.shared.log("Title: \(post.title)", level: .info, source: "WordPressAPI")
         DebugLogger.shared.log("Content length: \(post.content.count) characters", level: .info, source: "WordPressAPI")
-        DebugLogger.shared.log("Content preview: \(String(post.content.prefix(500)))", level: .debug, source: "WordPressAPI")
         
         // Check for potential issues
         if post.content.contains("\\n") {
@@ -378,28 +384,21 @@ class WordPressAPI {
                 // Log the response content
                 DebugLogger.shared.log("=== WordPress Update Response ===", level: .info, source: "WordPressAPI")
                 DebugLogger.shared.log("Updated post ID: \(updatedPost.id)", level: .info, source: "WordPressAPI")
-                DebugLogger.shared.log("Response content preview: \(String(updatedPost.content.rendered.prefix(500)))", level: .debug, source: "WordPressAPI")
+                DebugLogger.shared.log("Response content length: \(updatedPost.content.rendered.count) characters", level: .debug, source: "WordPressAPI")
 
                 return updatedPost
             } catch {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("Raw update post response: \(responseString)")
-                    DebugLogger.shared.log("Raw update response: \(responseString)", level: .error, source: "WordPressAPI")
-                }
-                print("Post update decoding error: \(error)")
-                DebugLogger.shared.log("Post update decoding error: \(error)", level: .error, source: "WordPressAPI")
+                DebugLogger.shared.log("Post update decoding error: \(error.localizedDescription)", level: .error, source: "WordPressAPI")
                 throw WordPressError.decodingError
             }
         } else if httpResponse.statusCode == 401 {
             throw WordPressError.unauthorized
         } else {
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Post update error response: \(responseString)")
-            }
+            DebugLogger.shared.log("Post update failed with status: \(httpResponse.statusCode)", level: .error, source: "WordPressAPI")
             throw WordPressError.httpError(statusCode: httpResponse.statusCode)
         }
     }
-    
+
     func deletePost(siteURL: String, username: String, password: String, postID: Int) async throws {
         let baseURL = normalizeURL(siteURL)
         let endpoint = "\(baseURL)/wp-json/wp/v2/posts/\(postID)"
@@ -430,9 +429,7 @@ class WordPressAPI {
         } else if httpResponse.statusCode == 401 {
             throw WordPressError.unauthorized
         } else {
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Post deletion error response: \(responseString)")
-            }
+            DebugLogger.shared.log("Post deletion failed with status: \(httpResponse.statusCode)", level: .error, source: "WordPressAPI")
             throw WordPressError.httpError(statusCode: httpResponse.statusCode)
         }
     }
@@ -573,10 +570,7 @@ class WordPressAPI {
                         let totalPages = totalPagesHeader.flatMap { Int($0) }
                         return (posts, totalPages, attemptPerPage)
                     } catch {
-                        if let responseString = String(data: data, encoding: .utf8) {
-                            print("Raw response: \(responseString)")
-                        }
-                        print("Decoding error: \(error)")
+                        DebugLogger.shared.log("Post fetch decoding error: \(error.localizedDescription)", level: .error, source: "WordPressAPI")
                         throw WordPressError.decodingError
                     }
                 } else if httpResponse.statusCode == 401 {
@@ -864,20 +858,61 @@ class WordPressAPI {
     }
 
     // MARK: - Helpers
-    
+
+    private func validateURL(_ url: String) throws {
+        guard let urlComponents = URLComponents(string: url),
+              let host = urlComponents.host else {
+            throw WordPressError.invalidURL
+        }
+
+        // Block localhost and loopback addresses
+        let blockedHosts = ["localhost", "127.0.0.1", "::1", "0.0.0.0"]
+        if blockedHosts.contains(host.lowercased()) {
+            DebugLogger.shared.log("Blocked localhost/loopback address: \(host)", level: .error, source: "WordPressAPI")
+            throw WordPressError.invalidURL
+        }
+
+        // Block private IP ranges
+        let privateIPRanges = [
+            "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.",
+            "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+            "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31."
+        ]
+
+        for range in privateIPRanges {
+            if host.hasPrefix(range) {
+                DebugLogger.shared.log("Blocked private IP address: \(host)", level: .error, source: "WordPressAPI")
+                throw WordPressError.invalidURL
+            }
+        }
+
+        // Ensure HTTPS is used
+        if urlComponents.scheme != "https" {
+            DebugLogger.shared.log("Non-HTTPS URL rejected: \(url)", level: .error, source: "WordPressAPI")
+            throw WordPressError.invalidURL
+        }
+    }
+
     private func normalizeURL(_ url: String) -> String {
         var normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         // Add https if no protocol specified
         if !normalized.hasPrefix("http://") && !normalized.hasPrefix("https://") {
             normalized = "https://\(normalized)"
         }
-        
+
+        // Reject HTTP URLs - only HTTPS is allowed for security
+        if normalized.hasPrefix("http://") {
+            DebugLogger.shared.log("WARNING: HTTP URLs are not allowed. Use HTTPS instead.", level: .error, source: "WordPressAPI")
+            // Convert http to https for user convenience, but log the warning
+            normalized = normalized.replacingOccurrences(of: "http://", with: "https://")
+        }
+
         // Remove trailing slash
         if normalized.hasSuffix("/") {
             normalized = String(normalized.dropLast())
         }
-        
+
         return normalized
     }
 
