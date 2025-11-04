@@ -38,6 +38,8 @@ jobs:
           ./Scripts/build-release.sh ${{ steps.version.outputs.version }}
 
       - name: Create DMG
+        env:
+          SKIP_CODESIGN: "true"  # Skip DMG signing in CI (app bundle is already signed)
         run: |
           chmod +x Scripts/create-dmg.sh
           ./Scripts/create-dmg.sh ${{ steps.version.outputs.version }}
