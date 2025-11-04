@@ -19,6 +19,27 @@
         -->
 
         <item>
+            <title>Version 1.0.3</title>
+            <pubDate>Mon, 04 Nov 2025 17:00:00 +0000</pubDate>
+            <sparkle:version>1.0.3</sparkle:version>
+            <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.3</h2>
+                <ul>
+                    <li>Updated About tab with new tagline: "A beautiful, native, distraction-free WordPress editor for Mac"</li>
+                    <li>Added disclaimer about independence from WordPress and Automattic</li>
+                    <li>Minor cleanup and improvements</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/quill/releases/download/v1.0.3/Quill-1.0.3.dmg"
+                length="3521197"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.2</title>
             <pubDate>Mon, 04 Nov 2025 00:00:00 +0000</pubDate>
             <sparkle:version>1.0.2</sparkle:version>
