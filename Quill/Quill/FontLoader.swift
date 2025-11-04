@@ -36,6 +36,9 @@ class FontLoader {
                 print("❌ Could not find font file: \(fontName)")
             }
         }
+
+        // List available fonts after registration
+        listAvailableFonts()
     }
 
     private func registerFont(from url: URL, name: String) {
