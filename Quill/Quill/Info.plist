@@ -3,9 +3,8 @@
 <plist version="1.0">
 <dict>
 	<!-- Sparkle Update Configuration -->
-	<!-- Replace YOUR_USERNAME with your GitHub username -->
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/zmh/quill/main/appcast.xml</string>
 
 	<!-- Enable automatic update checking -->
 	<key>SUEnableAutomaticChecks</key>

@@ -20,14 +20,14 @@ Quick setup guide for enabling GitHub distribution and automatic updates for Qui
 4. Add:
    - **Key**: `SUFeedURL`
    - **Type**: String
-   - **Value**: `https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml`
+   - **Value**: `https://raw.githubusercontent.com/zmh/quill/main/appcast.xml`
 
-   Replace `YOUR_USERNAME` with your actual GitHub username.
+   Replace `zmh` with your actual GitHub username.
 
 ## Step 3: Update Appcast Template
 
 Edit `appcast.xml` and replace:
-- `YOUR_USERNAME` with your GitHub username
+- `zmh` with your GitHub username
 - Update the version and release notes
 
 ## Step 4: Test Locally
@@ -68,7 +68,7 @@ GitHub Actions will automatically:
 
 The appcast.xml in your main branch will work automatically with the URL format:
 ```
-https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml
+https://raw.githubusercontent.com/zmh/quill/main/appcast.xml
 ```
 
 **Option B: GitHub Pages (Recommended for Production)**
@@ -88,7 +88,7 @@ https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml
 
 3. Update Info.plist `SUFeedURL` to:
    ```
-   https://YOUR_USERNAME.github.io/quill/appcast.xml
+   https://zmh.github.io/quill/appcast.xml
    ```
 
 ## Step 7: Verify Updates Work

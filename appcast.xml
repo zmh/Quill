@@ -4,7 +4,7 @@
         <title>Quill Updates</title>
         <description>Most recent updates to Quill</description>
         <language>en</language>
-        <link>https://github.com/YOUR_USERNAME/quill/releases</link>
+        <link>https://github.com/zmh/quill/releases</link>
 
         <!--
         UPDATE INSTRUCTIONS:
@@ -34,7 +34,7 @@
                 </ul>
             ]]></description>
             <enclosure
-                url="https://github.com/YOUR_USERNAME/quill/releases/download/v1.0.0/Quill-1.0.0.dmg"
+                url="https://github.com/zmh/quill/releases/download/v1.0.0/Quill-1.0.0.dmg"
                 length="0"
                 type="application/octet-stream"
             />

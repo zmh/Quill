@@ -11,7 +11,7 @@ Sparkle framework has been successfully integrated into Quill for automatic upda
 
 ### ✅ Info.plist Configuration
 - **Location**: `Quill/Quill/Info.plist`
-- **SUFeedURL**: Configured (needs YOUR_USERNAME replacement)
+- **SUFeedURL**: Configured (needs zmh replacement)
 - **Automatic Checks**: Enabled (daily)
 - **Update Interval**: 86400 seconds (24 hours)
 
@@ -31,11 +31,11 @@ Sparkle framework has been successfully integrated into Quill for automatic upda
 
 ### 1. Update GitHub Username (Required)
 
-Edit `Quill/Quill/Info.plist` and replace `YOUR_USERNAME`:
+Edit `Quill/Quill/Info.plist` and replace `zmh`:
 
 ```xml
 <key>SUFeedURL</key>
-<string>https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml</string>
+<string>https://raw.githubusercontent.com/zmh/quill/main/appcast.xml</string>
 ```
 
 Change to:
@@ -63,12 +63,12 @@ Then launch the app and check:
 
 ### 3. Update appcast.xml
 
-Edit `appcast.xml` in the root and replace `YOUR_USERNAME`:
+Edit `appcast.xml` in the root and replace `zmh`:
 
 ```xml
-<link>https://github.com/YOUR_USERNAME/quill/releases</link>
+<link>https://github.com/zmh/quill/releases</link>
 ...
-<enclosure url="https://github.com/YOUR_USERNAME/quill/releases/download/v1.0.0/Quill-1.0.0.dmg" />
+<enclosure url="https://github.com/zmh/quill/releases/download/v1.0.0/Quill-1.0.0.dmg" />
 ```
 
 ---

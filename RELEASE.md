@@ -210,9 +210,9 @@ Quill uses [Sparkle](https://sparkle-project.org/) for automatic updates.
 3. Add a new key:
    - Key: `SUFeedURL`
    - Type: String
-   - Value: `https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml`
+   - Value: `https://raw.githubusercontent.com/zmh/quill/main/appcast.xml`
 
-Replace `YOUR_USERNAME` with your GitHub username.
+Replace `zmh` with your GitHub username.
 
 ### Step 3: Enable Automatic Update Checks
 
@@ -240,14 +240,14 @@ The "Check for Updates..." menu item has been added to the app menu.
 
 3. Update `SUFeedURL` in Info.plist:
    ```
-   https://YOUR_USERNAME.github.io/quill/appcast.xml
+   https://zmh.github.io/quill/appcast.xml
    ```
 
 **Option B: Main Branch (Simpler)**
 
 Just keep `appcast.xml` in the main branch and use:
 ```
-https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml
+https://raw.githubusercontent.com/zmh/quill/main/appcast.xml
 ```
 
 ### Step 5: Sign Updates (Production)
@@ -485,5 +485,5 @@ For issues with the release process:
 4. Open an issue on GitHub
 
 For user support:
-- GitHub Issues: https://github.com/YOUR_USERNAME/quill/issues
+- GitHub Issues: https://github.com/zmh/quill/issues
 - Email: your@email.com

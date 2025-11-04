@@ -85,12 +85,12 @@ GitHub Actions will automatically:
 For automatic updates to work, host `appcast.xml`:
 
 **Option A: Main Branch** (Easiest)
-- Use: `https://raw.githubusercontent.com/YOUR_USERNAME/quill/main/appcast.xml`
+- Use: `https://raw.githubusercontent.com/zmh/quill/main/appcast.xml`
 - Update appcast.xml after each release
 
 **Option B: GitHub Pages** (Recommended)
 - Follow DISTRIBUTION_SETUP.md Step 6
-- Use: `https://YOUR_USERNAME.github.io/quill/appcast.xml`
+- Use: `https://zmh.github.io/quill/appcast.xml`
 
 ---
 

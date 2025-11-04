@@ -12,7 +12,7 @@ Quill is a native WordPress editor for macOS that provides a distraction-free wr
 
 ### Download
 
-1. Go to the [Releases page](https://github.com/YOUR_USERNAME/quill/releases)
+1. Go to the [Releases page](https://github.com/zmh/quill/releases)
 2. Download the latest `Quill-X.X.X.dmg` file
 
 ### Install
@@ -91,7 +91,7 @@ If you prefer to build Quill yourself:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/quill.git
+git clone https://github.com/zmh/quill.git
 cd quill
 
 # Open in Xcode
@@ -129,8 +129,8 @@ This can happen if the download was corrupted:
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/YOUR_USERNAME/quill/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/YOUR_USERNAME/quill/discussions)
+- **Issues**: [GitHub Issues](https://github.com/zmh/quill/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/zmh/quill/discussions)
 - **Email**: your@email.com
 
 ## Privacy
