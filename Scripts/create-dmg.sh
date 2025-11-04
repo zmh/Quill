@@ -75,15 +75,20 @@ tell application "Finder"
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        set the bounds of container window to {100, 100, 650, 450}
+        set the bounds of container window to {100, 100, 760, 500}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 128
-        set background color of viewOptions to {255, 255, 255}
+        set icon size of viewOptions to 120
+        -- Subtle blue-grey background (RGB: 240, 245, 250)
+        set background color of viewOptions to {61680, 62965, 64250}
+        set text size of viewOptions to 14
+        set label position of viewOptions to bottom
 
-        -- Set icon positions
-        set position of item "$APP_NAME.app" of container window to {150, 150}
-        set position of item "Applications" of container window to {400, 150}
+        -- Position icons for better visual balance
+        -- App icon on the left
+        set position of item "$APP_NAME.app" of container window to {180, 180}
+        -- Applications folder on the right
+        set position of item "Applications" of container window to {480, 180}
 
         close
         open
