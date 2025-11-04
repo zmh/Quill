@@ -1,0 +1,154 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on version tags like v1.0.0
+
+env:
+  XCODE_VERSION: '16.0'  # Update to match your Xcode version
+
+jobs:
+  build-and-release:
+    name: Build and Release macOS App
+    runs-on: macos-14  # Latest macOS runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for changelog generation
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Install dependencies
+        run: |
+          # Install xcpretty for prettier build output
+          gem install xcpretty
+
+      - name: Build Release
+        run: |
+          chmod +x Scripts/build-release.sh
+          ./Scripts/build-release.sh ${{ steps.version.outputs.version }}
+
+      - name: Create DMG
+        run: |
+          chmod +x Scripts/create-dmg.sh
+          ./Scripts/create-dmg.sh ${{ steps.version.outputs.version }}
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+
+          # Generate changelog
+          if [ -n "$PREV_TAG" ]; then
+            echo "## What's Changed" > release_notes.md
+            echo "" >> release_notes.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> release_notes.md
+          else
+            echo "Initial release" > release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "1. Download \`Quill-${{ steps.version.outputs.version }}.dmg\`" >> release_notes.md
+          echo "2. Open the DMG file" >> release_notes.md
+          echo "3. Drag Quill to your Applications folder" >> release_notes.md
+          echo "4. Launch Quill from Applications" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Verification" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "SHA256 checksum:" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          cat build/Quill-${{ steps.version.outputs.version }}.dmg.sha256 >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/Quill-${{ steps.version.outputs.version }}.dmg
+            build/Quill-${{ steps.version.outputs.version }}.dmg.sha256
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Appcast
+        run: |
+          # Create appcast directory if it doesn't exist
+          mkdir -p build/appcast
+
+          # Generate appcast entry
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_SIZE=$(stat -f%z "build/Quill-${VERSION}.dmg")
+          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/Quill-${VERSION}.dmg"
+
+          # Note: In production, you would sign the release with EdDSA
+          # For now, we create the structure without signatures
+          cat > "build/appcast/appcast.xml" << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+              <channel>
+                  <title>Quill Updates</title>
+                  <description>Most recent updates to Quill</description>
+                  <language>en</language>
+                  <item>
+                      <title>Version ${VERSION}</title>
+                      <pubDate>${DATE}</pubDate>
+                      <sparkle:version>${VERSION}</sparkle:version>
+                      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                      <description><![CDATA[
+                          <h2>What's New in ${VERSION}</h2>
+                          <p>See the <a href="https://github.com/${{ github.repository }}/releases/tag/v${VERSION}">release notes</a> for details.</p>
+                      ]]></description>
+                      <enclosure
+                          url="${DOWNLOAD_URL}"
+                          length="${DMG_SIZE}"
+                          type="application/octet-stream"
+                      />
+                      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                  </item>
+              </channel>
+          </rss>
+          EOF
+
+          echo "Appcast generated at build/appcast/appcast.xml"
+
+      - name: Upload Appcast as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appcast
+          path: build/appcast/appcast.xml
+
+  notify:
+    name: Notify Release Complete
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "### Release Complete! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version ${{ needs.build-and-release.outputs.version }} has been built and released." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Test the release by downloading from GitHub" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update appcast.xml in your gh-pages branch" >> $GITHUB_STEP_SUMMARY
+          echo "3. Announce the release to users" >> $GITHUB_STEP_SUMMARY
