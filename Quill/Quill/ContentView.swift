@@ -8,6 +8,25 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Helper Functions
+
+/// Converts plain text to HTML with proper paragraph and line break handling
+func convertTextToHTML(_ text: String) -> String {
+    if text.isEmpty {
+        return "<p></p>"
+    }
+
+    // Split by double newlines for paragraphs
+    let paragraphs = text.components(separatedBy: "\n\n")
+    let htmlParagraphs = paragraphs.map { paragraph in
+        // Replace single newlines with <br> tags within paragraphs
+        let withBreaks = paragraph.replacingOccurrences(of: "\n", with: "<br>")
+        return "<p>\(withBreaks)</p>"
+    }
+
+    return htmlParagraphs.joined(separator: "\n")
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var posts: [Post]
@@ -998,10 +1017,13 @@ struct PostEditorView: View {
 struct QuickComposeView: View {
     @Binding var isPresented: Bool
     let onCompose: (String, String) -> Void
-    
+
+    @State private var postTitle = ""
     @State private var composeText = ""
+    @FocusState private var isTitleFocused: Bool
     @FocusState private var isFocused: Bool
-    
+    @AppStorage("newPostTitleFormat") private var newPostTitleFormat = "date"
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -1017,15 +1039,11 @@ struct QuickComposeView: View {
                 .buttonStyle(.plain)
                 
                 Button("Create") {
-                    let lines = composeText.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-                    let title = String(lines.first ?? "")
-                    let content = lines.count > 1 ? String(lines[1]) : ""
-                    
-                    onCompose(title, content)
+                    onCompose(postTitle, composeText)
                     isPresented = false
                 }
                 .buttonStyle(QuillButtonStyle())
-                .disabled(composeText.isEmpty)
+                .disabled(postTitle.isEmpty)
             }
             .padding()
             
@@ -1033,25 +1051,40 @@ struct QuickComposeView: View {
             
             // Compose Field
             VStack(alignment: .leading, spacing: 8) {
-                Text("What would you like to say?")
+                Text("Title")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
+                TextField("Post title", text: $postTitle)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isTitleFocused)
+
+                Text("Content")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+
                 TextEditor(text: $composeText)
                     .font(.body)
                     .scrollContentBackground(.hidden)
+                    .scrollIndicators(.hidden)
                     .focused($isFocused)
                     .frame(minHeight: 150)
-                
-                Text("First line becomes the title")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
             }
             .padding()
         }
-        .frame(width: 500, height: 300)
+        .frame(width: 500, height: 350)
         .onAppear {
-            isFocused = true
+            if let format = PostTitleFormat(rawValue: newPostTitleFormat) {
+                postTitle = Date().toPostTitle(format: format)
+            } else {
+                postTitle = Date().toYearMonthDayString()
+            }
+            // Focus on content field by default
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
+            }
         }
     }
 }
@@ -1285,7 +1318,8 @@ struct CreatePostTabView: View {
     @State private var postContent = ""
     @FocusState private var isTitleFocused: Bool
     @FocusState private var isContentFocused: Bool
-    
+    @AppStorage("newPostTitleFormat") private var newPostTitleFormat = "date"
+
     var body: some View {
         VStack(spacing: 0) {
             TextField("Post title", text: $postTitle)
@@ -1305,6 +1339,8 @@ struct CreatePostTabView: View {
                 .focused($isContentFocused)
                 .padding(.horizontal, 16)
                 .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(alignment: .topLeading) {
                     if postContent.isEmpty && !isContentFocused {
                         Text("Start writing...")
@@ -1330,24 +1366,37 @@ struct CreatePostTabView: View {
             }
         }
         .onAppear {
-            // Clear fields when tab is shown
-            postTitle = ""
+            // Pre-fill title based on user preference
+            if let format = PostTitleFormat(rawValue: newPostTitleFormat) {
+                postTitle = Date().toPostTitle(format: format)
+            } else {
+                postTitle = Date().toYearMonthDayString()
+            }
             postContent = ""
+            // Focus on content field by default
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isContentFocused = true
+            }
         }
     }
-    
+
     private func createPost() {
+        let htmlContent = convertTextToHTML(postContent)
         let post = Post(
             title: postTitle,
-            content: postContent.isEmpty ? "<p></p>" : "<p>\(postContent)</p>",
+            content: htmlContent,
             status: .draft
         )
 
         modelContext.insert(post)
         selectedPostIDs = [post.id]
 
-        // Clear the form
-        postTitle = ""
+        // Reset the form with a new date
+        if let format = PostTitleFormat(rawValue: newPostTitleFormat) {
+            postTitle = Date().toPostTitle(format: format)
+        } else {
+            postTitle = Date().toYearMonthDayString()
+        }
         postContent = ""
 
         // Switch to posts tab to show the new post
@@ -1363,30 +1412,55 @@ struct ComposeWindow: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var posts: [Post]
 
+    @State private var postTitle = ""
     @State private var composeText = ""
     @State private var postStatus: PostStatus = .draft
     @State private var showMetadata = false
+    @FocusState private var isTitleFocused: Bool
     @FocusState private var isFocused: Bool
+    @AppStorage("newPostTitleFormat") private var newPostTitleFormat = "date"
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: $composeText)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .focused($isFocused)
-                .padding()
+        VStack(spacing: 0) {
+            // Title field
+            TextField("Post title", text: $postTitle)
+                .textFieldStyle(.plain)
+                .font(.title2)
+                .fontWeight(.semibold)
+                .focused($isTitleFocused)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
 
-            // Placeholder text
-            if composeText.isEmpty {
-                Text("Just start typing! First line becomes the title.")
+            Divider()
+                .padding(.horizontal, 16)
+
+            // Content editor
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $composeText)
                     .font(.body)
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 21)
-                    .padding(.top, 16)
-                    .allowsHitTesting(false)
+                    .scrollContentBackground(.hidden)
+                    .scrollIndicators(.hidden)
+                    .focused($isFocused)
+                    .padding(.leading, 16)
+                    .padding(.trailing, 0)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Placeholder text
+                if composeText.isEmpty && !isFocused {
+                    Text("Start writing...")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 21)
+                        .padding(.top, 16)
+                        .allowsHitTesting(false)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
         }
-        .frame(width: 500, height: 300)
+        .frame(width: 500, height: 350)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Spacer()
@@ -1398,28 +1472,33 @@ struct ComposeWindow: View {
                         .font(.system(size: 20))
                 }
                 .buttonStyle(.borderless)
-                .foregroundStyle(composeText.isEmpty ? Color.secondary : Color.blue)
-                .disabled(composeText.isEmpty)
+                .foregroundStyle(postTitle.isEmpty ? Color.secondary : Color.blue)
+                .disabled(postTitle.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
                 .help("Create post")
             }
         }
         .onAppear {
-            // Clear the text and reset state when the window appears
+            // Pre-fill title based on user preference and reset state when the window appears
+            if let format = PostTitleFormat(rawValue: newPostTitleFormat) {
+                postTitle = Date().toPostTitle(format: format)
+            } else {
+                postTitle = Date().toYearMonthDayString()
+            }
             composeText = ""
             postStatus = .draft
-            isFocused = true
+            // Focus on content field by default
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
+            }
         }
     }
 
     private func createPost() {
-        let lines = composeText.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-        let title = String(lines.first ?? "")
-        let content = lines.count > 1 ? String(lines[1]) : ""
-
+        let htmlContent = convertTextToHTML(composeText)
         let post = Post(
-            title: title,
-            content: content,
+            title: postTitle,
+            content: htmlContent,
             status: postStatus
         )
 
