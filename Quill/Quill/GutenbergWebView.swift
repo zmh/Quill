@@ -171,6 +171,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Gutenberg Editor</title>
+            <!-- iA Writer Fonts from CDN -->
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/codex-src/iA-Fonts@master/iA%20Writer%20Mono/Webfonts/index.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/codex-src/iA-Fonts@master/iA%20Writer%20Duo/Webfonts/index.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/codex-src/iA-Fonts@master/iA%20Writer%20Quattro/Webfonts/index.css">
             <!-- Cache bust: v5.0 Professional blue link colors -->
             <style>
                 :root {
@@ -178,9 +182,9 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                         switch typeface {
                         case "system": return "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
                         case "sf-mono": return "'SF Mono', Monaco, 'Courier New', monospace"
-                        case "ia-mono": return "'iA Writer Mono S', 'iAWriterMonoS-Regular', 'SF Mono', Monaco, monospace"
-                        case "ia-duo": return "'iA Writer Duo S', 'iAWriterDuoS-Regular', -apple-system, sans-serif"
-                        case "ia-quattro": return "'iA Writer Quattro S', 'iAWriterQuattroS-Regular', Georgia, serif"
+                        case "ia-mono": return "'iA Writer Mono', monospace"
+                        case "ia-duo": return "'iA Writer Duo', monospace"
+                        case "ia-quattro": return "'iA Writer Quattro', serif"
                         case "georgia": return "Georgia, 'Times New Roman', serif"
                         case "verdana": return "Verdana, Geneva, sans-serif"
                         case "arial": return "Arial, Helvetica, sans-serif"
@@ -3462,6 +3466,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Gutenberg Editor</title>
+            <!-- iA Writer Fonts from CDN -->
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/codex-src/iA-Fonts@master/iA%20Writer%20Mono/Webfonts/index.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/codex-src/iA-Fonts@master/iA%20Writer%20Duo/Webfonts/index.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/codex-src/iA-Fonts@master/iA%20Writer%20Quattro/Webfonts/index.css">
             <!-- Cache bust: v5.0 Professional blue link colors -->
             <style>
                 :root {
@@ -3469,9 +3477,9 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                         switch typeface {
                         case "system": return "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
                         case "sf-mono": return "'SF Mono', Monaco, 'Courier New', monospace"
-                        case "ia-mono": return "'iA Writer Mono S', 'iAWriterMonoS-Regular', 'SF Mono', Monaco, monospace"
-                        case "ia-duo": return "'iA Writer Duo S', 'iAWriterDuoS-Regular', -apple-system, sans-serif"
-                        case "ia-quattro": return "'iA Writer Quattro S', 'iAWriterQuattroS-Regular', Georgia, serif"
+                        case "ia-mono": return "'iA Writer Mono', monospace"
+                        case "ia-duo": return "'iA Writer Duo', monospace"
+                        case "ia-quattro": return "'iA Writer Quattro', serif"
                         case "georgia": return "Georgia, 'Times New Roman', serif"
                         case "verdana": return "Verdana, Geneva, sans-serif"
                         case "arial": return "Arial, Helvetica, sans-serif"
