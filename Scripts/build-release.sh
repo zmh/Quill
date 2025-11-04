@@ -63,9 +63,10 @@ else
         -destination "generic/platform=macOS" \
         MARKETING_VERSION="$VERSION" \
         CURRENT_PROJECT_VERSION="$VERSION" \
-        CODE_SIGN_STYLE=Automatic \
-        CODE_SIGN_IDENTITY="Apple Development" \
-        DEVELOPMENT_TEAM="86G95Q55DC" \
+        CODE_SIGN_STYLE=Manual \
+        CODE_SIGN_IDENTITY="Developer ID Application: Clay Software, Inc. (C68GA48KN3)" \
+        DEVELOPMENT_TEAM="C68GA48KN3" \
+        ENABLE_HARDENED_RUNTIME=YES \
         -allowProvisioningUpdates
 fi
 
@@ -97,11 +98,13 @@ else
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>mac-application</string>
+    <string>developer-id</string>
     <key>signingStyle</key>
-    <string>automatic</string>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>Developer ID Application: Clay Software, Inc. (C68GA48KN3)</string>
     <key>teamID</key>
-    <string>86G95Q55DC</string>
+    <string>C68GA48KN3</string>
     <key>uploadSymbols</key>
     <true/>
     <key>compileBitcode</key>

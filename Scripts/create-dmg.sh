@@ -106,6 +106,15 @@ hdiutil detach "$MOUNT_DIR"
 echo -e "${BLUE}→${NC} Converting to final DMG..."
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH"
 
+# Sign the DMG (required for notarization)
+if [ "$SKIP_CODESIGN" != "true" ]; then
+    echo -e "${BLUE}→${NC} Signing DMG..."
+    codesign --sign "Developer ID Application: Clay Software, Inc. (C68GA48KN3)" \
+        --timestamp \
+        --options runtime \
+        "$DMG_PATH"
+fi
+
 # Clean up
 echo -e "${BLUE}→${NC} Cleaning up..."
 rm -rf "$DMG_DIR"
