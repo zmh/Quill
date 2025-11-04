@@ -38,22 +38,60 @@ mkdir -p "$BUILD_DIR"
 
 # Archive the app
 echo -e "\n${BLUE}→${NC} Creating archive..."
-xcodebuild archive \
-    -project "$XCODE_PROJECT" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -archivePath "$ARCHIVE_PATH" \
-    -destination "generic/platform=macOS" \
-    MARKETING_VERSION="$VERSION" \
-    CURRENT_PROJECT_VERSION="$VERSION" \
-    CODE_SIGN_STYLE=Automatic \
-    CODE_SIGN_IDENTITY="Apple Development" \
-    DEVELOPMENT_TEAM="86G95Q55DC" \
-    -allowProvisioningUpdates
+
+# Check if we should skip code signing (for CI/CD)
+if [ "$SKIP_CODESIGN" = "true" ]; then
+    echo "Building without code signing for distribution..."
+    xcodebuild archive \
+        -project "$XCODE_PROJECT" \
+        -scheme "$SCHEME" \
+        -configuration "$CONFIGURATION" \
+        -archivePath "$ARCHIVE_PATH" \
+        -destination "generic/platform=macOS" \
+        MARKETING_VERSION="$VERSION" \
+        CURRENT_PROJECT_VERSION="$VERSION" \
+        CODE_SIGN_IDENTITY="-" \
+        CODE_SIGNING_REQUIRED=NO \
+        CODE_SIGNING_ALLOWED=NO \
+        -allowProvisioningUpdates
+else
+    xcodebuild archive \
+        -project "$XCODE_PROJECT" \
+        -scheme "$SCHEME" \
+        -configuration "$CONFIGURATION" \
+        -archivePath "$ARCHIVE_PATH" \
+        -destination "generic/platform=macOS" \
+        MARKETING_VERSION="$VERSION" \
+        CURRENT_PROJECT_VERSION="$VERSION" \
+        CODE_SIGN_STYLE=Automatic \
+        CODE_SIGN_IDENTITY="Apple Development" \
+        DEVELOPMENT_TEAM="86G95Q55DC" \
+        -allowProvisioningUpdates
+fi
 
 # Create export options plist
 echo -e "\n${BLUE}→${NC} Creating export options..."
-cat > "$BUILD_DIR/ExportOptions.plist" << EOF
+if [ "$SKIP_CODESIGN" = "true" ]; then
+    cat > "$BUILD_DIR/ExportOptions.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>mac-application</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>signingCertificate</key>
+    <string>-</string>
+    <key>uploadSymbols</key>
+    <false/>
+    <key>compileBitcode</key>
+    <false/>
+</dict>
+</plist>
+EOF
+else
+    cat > "$BUILD_DIR/ExportOptions.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -71,6 +109,7 @@ cat > "$BUILD_DIR/ExportOptions.plist" << EOF
 </dict>
 </plist>
 EOF
+fi
 
 # Export the archive
 echo -e "\n${BLUE}→${NC} Exporting application..."

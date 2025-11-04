@@ -29,6 +29,8 @@ jobs:
           echo "Building version: $VERSION"
 
       - name: Build Release
+        env:
+          SKIP_CODESIGN: "true"  # Build unsigned for GitHub distribution
         run: |
           chmod +x Scripts/build-release.sh
           ./Scripts/build-release.sh ${{ steps.version.outputs.version }}
