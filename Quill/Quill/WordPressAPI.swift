@@ -201,21 +201,83 @@ class WordPressAPI {
         }
         
         let (data, response) = try await session.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw WordPressError.invalidResponse
         }
-        
-        if httpResponse.statusCode == 201 {
+
+        if httpResponse.statusCode == 201 || httpResponse.statusCode == 200 {
+            if httpResponse.statusCode == 200 {
+                DebugLogger.shared.log("Received HTTP 200 on post creation; treating as success", level: .warning, source: "WordPressAPI")
+            }
+
+            // Log the raw response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                DebugLogger.shared.log("Raw create post response: \(String(responseString.prefix(500)))", level: .debug, source: "WordPressAPI")
+                print("📥 Raw create post response: \(responseString)")
+            }
+
+            // First check if this is actually a WordPress error response (they sometimes return HTTP 200 with errors)
+            let decoder = JSONDecoder()
+            if let errorResponse = try? decoder.decode(WordPressErrorResponse.self, from: data) {
+                DebugLogger.shared.log("WordPress returned error in HTTP 200 response: \(errorResponse.code) - \(errorResponse.message)", level: .warning, source: "WordPressAPI")
+
+                // Special case: rest_forbidden during post creation often means the post was created
+                // but WordPress couldn't return the full post object due to permission issues
+                // In this case, we'll try to fetch recent posts to find the one we just created
+                if errorResponse.code == "rest_forbidden" {
+                    DebugLogger.shared.log("Attempting to recover from rest_forbidden by fetching recent posts", level: .info, source: "WordPressAPI")
+                    // Don't throw immediately - let it fall through to try fetching recent posts below
+                } else if errorResponse.code == "rest_cannot_create" {
+                    throw WordPressError.wordPressError(code: errorResponse.code, message: errorResponse.message)
+                } else if errorResponse.data?.status == 401 {
+                    throw WordPressError.unauthorized
+                } else {
+                    throw WordPressError.wordPressError(code: errorResponse.code, message: errorResponse.message)
+                }
+            }
+
+            // Try to decode as a successful post response
             do {
-                let decoder = JSONDecoder()
                 let createdPost = try decoder.decode(WordPressPost.self, from: data)
                 return createdPost
             } catch {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("Raw create post response: \(responseString)")
+                // If we got a rest_forbidden error, try to fetch recent posts to find the one we just created
+                if let responseString = String(data: data, encoding: .utf8),
+                   responseString.contains("rest_forbidden") {
+                    DebugLogger.shared.log("Post creation returned rest_forbidden, attempting to fetch recent posts to recover", level: .info, source: "WordPressAPI")
+
+                    // Try to fetch recent posts and find the one matching our title/slug
+                    do {
+                        let recentPosts = try await fetchPosts(
+                            siteURL: baseURL,
+                            username: username,
+                            password: password,
+                            page: 1,
+                            perPage: 10
+                        )
+
+                        // Look for a post matching the title we just created
+                        if let matchingPost = recentPosts.first(where: {
+                            HTMLHandler.shared.htmlToPlainText($0.title.rendered) == post.title ||
+                            $0.slug == post.slug
+                        }) {
+                            DebugLogger.shared.log("Successfully recovered created post with ID: \(matchingPost.id)", level: .info, source: "WordPressAPI")
+                            return matchingPost
+                        } else {
+                            DebugLogger.shared.log("Could not find recently created post in recent posts list", level: .warning, source: "WordPressAPI")
+                        }
+                    } catch {
+                        DebugLogger.shared.log("Failed to fetch recent posts for recovery: \(error)", level: .warning, source: "WordPressAPI")
+                    }
                 }
-                print("Post creation decoding error: \(error)")
+
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("❌ Failed to decode create post response: \(responseString)")
+                    DebugLogger.shared.log("Failed to decode create post response: \(responseString)", level: .error, source: "WordPressAPI")
+                }
+                print("❌ Post creation decoding error: \(error)")
+                DebugLogger.shared.log("Post creation decoding error: \(error)", level: .error, source: "WordPressAPI")
                 throw WordPressError.decodingError
             }
         } else if httpResponse.statusCode == 401 {
@@ -295,15 +357,29 @@ class WordPressAPI {
         }
         
         if httpResponse.statusCode == 200 {
+            // First check if this is actually a WordPress error response (they sometimes return HTTP 200 with errors)
+            let decoder = JSONDecoder()
+            if let errorResponse = try? decoder.decode(WordPressErrorResponse.self, from: data) {
+                DebugLogger.shared.log("WordPress returned error in HTTP 200 response: \(errorResponse.code) - \(errorResponse.message)", level: .error, source: "WordPressAPI")
+
+                // Handle specific error codes
+                if errorResponse.code == "rest_forbidden" || errorResponse.code == "rest_cannot_edit" {
+                    throw WordPressError.wordPressError(code: errorResponse.code, message: errorResponse.message)
+                } else if errorResponse.data?.status == 401 {
+                    throw WordPressError.unauthorized
+                } else {
+                    throw WordPressError.wordPressError(code: errorResponse.code, message: errorResponse.message)
+                }
+            }
+
             do {
-                let decoder = JSONDecoder()
                 let updatedPost = try decoder.decode(WordPressPost.self, from: data)
-                
+
                 // Log the response content
                 DebugLogger.shared.log("=== WordPress Update Response ===", level: .info, source: "WordPressAPI")
                 DebugLogger.shared.log("Updated post ID: \(updatedPost.id)", level: .info, source: "WordPressAPI")
                 DebugLogger.shared.log("Response content preview: \(String(updatedPost.content.rendered.prefix(500)))", level: .debug, source: "WordPressAPI")
-                
+
                 return updatedPost
             } catch {
                 if let responseString = String(data: data, encoding: .utf8) {
@@ -968,6 +1044,17 @@ class WordPressAPI {
 
 // MARK: - Models
 
+// WordPress error response model
+struct WordPressErrorResponse: Codable {
+    let code: String
+    let message: String
+    let data: ErrorData?
+
+    struct ErrorData: Codable {
+        let status: Int?
+    }
+}
+
 // Request model for creating/updating posts
 struct WordPressPostRequest: Codable {
     let title: String
@@ -1176,7 +1263,8 @@ enum WordPressError: LocalizedError {
     case decodingError
     case encodingError
     case missingRemoteID
-    
+    case wordPressError(code: String, message: String)
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -1193,6 +1281,8 @@ enum WordPressError: LocalizedError {
             return "Failed to encode request data"
         case .missingRemoteID:
             return "Cannot update post: missing remote ID"
+        case .wordPressError(let code, let message):
+            return "WordPress error (\(code)): \(message)"
         }
     }
 }
