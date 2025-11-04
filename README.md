@@ -8,7 +8,7 @@
 
 **A beautiful, distraction-free WordPress editor for Mac**
 
-[Download Latest Release (v1.0.2)](https://github.com/zmh/quill-app/releases/latest) • [View All Releases](https://github.com/zmh/quill-app/releases)
+[Download Latest Release (v1.0.2)](https://github.com/zmh/Quill/releases/latest) • [View All Releases](https://github.com/zmh/Quill/releases)
 
 ![Platform](https://img.shields.io/badge/Platform-macOS%2015.5%2B-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
@@ -33,9 +33,9 @@ Quill is a native Mac app that lets you write and publish WordPress blog posts o
 
 ### Download (Recommended)
 
-**[→ Download Quill v1.0.2](https://github.com/zmh/quill-app/releases/latest)**
+**[→ Download Quill v1.0.2](https://github.com/zmh/Quill/releases/latest)**
 
-1. Download the latest `.dmg` from the [Releases page](https://github.com/zmh/quill-app/releases)
+1. Download the latest `.dmg` from the [Releases page](https://github.com/zmh/Quill/releases)
 2. Open the `.dmg` and drag Quill to your Applications folder
 3. Launch Quill and connect your WordPress site
 
@@ -44,8 +44,8 @@ Quill is a native Mac app that lets you write and publish WordPress blog posts o
 Requires Xcode 16+ and macOS 15.5+:
 
 ```bash
-git clone https://github.com/zmh/quill-app.git
-cd quill-app
+git clone https://github.com/zmh/Quill.git
+cd Quill
 open Quill/Quill.xcodeproj
 ```
 
@@ -82,6 +82,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Independent project, not affiliated with WordPress or Automattic**
 
-[Report an Issue](https://github.com/zmh/quill-app/issues) • [Request a Feature](https://github.com/zmh/quill-app/issues/new)
+[Report an Issue](https://github.com/zmh/Quill/issues) • [Request a Feature](https://github.com/zmh/Quill/issues/new)
 
 </div>
