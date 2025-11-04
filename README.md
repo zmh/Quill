@@ -36,10 +36,14 @@ Quill is a native macOS application that provides a distraction-free writing exp
 - Native keyboard shortcuts
 - Proper macOS button styles and interactions
 
-### 🔐 Secure Authentication
-- Support for WordPress Application Passwords
-- Credentials stored securely in macOS Keychain
-- No passwords or tokens stored in code or preferences
+### 🔐 Security & Privacy
+- **HTTPS Required**: All WordPress connections use HTTPS only
+- **Certificate Validation**: SSL/TLS certificates validated to prevent MITM attacks
+- **Keychain Storage**: Credentials stored exclusively in macOS Keychain with device-only access
+- **No Data Collection**: Zero analytics, tracking, or telemetry
+- **Application Passwords**: Support for WordPress Application Passwords (recommended)
+- **Input Validation**: URL validation prevents SSRF attacks on private networks
+- **No Logging**: User content never logged in production builds
 
 ### 📝 Post Management
 - Create, edit, and publish posts
@@ -52,8 +56,9 @@ Quill is a native macOS application that provides a distraction-free writing exp
 
 - macOS 15.5 (Sequoia) or later
 - Xcode 16.0 or later (for building from source)
-- WordPress site with REST API enabled
-- WordPress Application Password (for self-hosted sites)
+- **WordPress site with HTTPS enabled** (HTTP not supported for security)
+- WordPress REST API enabled (WordPress 4.7+)
+- WordPress Application Password (for self-hosted sites, recommended)
 
 ## 🚀 Getting Started
 
@@ -97,13 +102,27 @@ open ~/Library/Developer/Xcode/DerivedData/Quill-*/Build/Products/Debug/Quill.ap
 
 ### Setting Up Your WordPress Site
 
-1. Launch Quill and open Settings (⌘,)
-2. Go to the "Accounts" tab
-3. Enter your WordPress site URL
-4. For self-hosted WordPress:
-   - Create an Application Password in WordPress admin → Users → Profile
-   - Enter your username and the generated password
-5. Click "Connect"
+**Security Note**: Quill requires HTTPS for all WordPress connections. HTTP URLs will be automatically upgraded to HTTPS.
+
+1. **Ensure your WordPress site uses HTTPS**
+   - Your site URL must start with `https://`
+   - HTTP connections are blocked for security
+
+2. **Launch Quill and open Settings (⌘,)**
+
+3. **Go to the "Accounts" tab**
+
+4. **Enter your WordPress site URL**
+   - Example: `https://yourblog.com`
+   - The `https://` prefix is required
+
+5. **For self-hosted WordPress sites:**
+   - Create an Application Password in WordPress admin → Users → Your Profile → Application Passwords
+   - Enter your WordPress username
+   - Enter the generated Application Password (not your regular password)
+   - Click "Connect"
+
+**Important**: Never use your main WordPress password. Always create an Application Password for better security. Application Passwords can be revoked independently without changing your main password.
 
 ### Customizing the Editor
 
@@ -151,15 +170,52 @@ xcodebuild test -project Quill/Quill.xcodeproj -scheme Quill -destination 'platf
 - Keep views small and focused
 - Use SwiftData for all persistence
 
+## 🔒 Security
+
+Security is a top priority for Quill. We implement multiple layers of protection:
+
+### Network Security
+- **HTTPS Only**: All API connections require HTTPS
+- **Certificate Validation**: SSL/TLS certificates validated on every request
+- **No HTTP Fallback**: HTTP URLs automatically upgraded to HTTPS
+- **Private IP Blocking**: Localhost and private IP ranges blocked to prevent SSRF
+
+### Credential Protection
+- **Keychain Storage**: All passwords stored in macOS Keychain
+- **Device-Only Access**: Credentials use `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+- **Never in Files**: Credentials never stored in database, UserDefaults, or files
+- **No iCloud Sync**: Credentials don't sync across devices for security
+
+### Privacy
+- **No Logging**: User content never logged in production builds
+- **No Analytics**: Zero data collection or telemetry
+- **Local Storage**: All content stored locally on your Mac
+- **Minimal API Calls**: Only necessary data transmitted to WordPress
+
+### Reporting Security Issues
+
+**Do not** open public GitHub issues for security vulnerabilities.
+
+Please report security issues responsibly by emailing: **[Your Email Here]**
+
+For more details, see [SECURITY.md](SECURITY.md)
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and development process.
 
+Quick start:
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+Please ensure:
+- All tests pass
+- Code follows Swift style guide
+- Security checklist verified (see SECURITY.md)
+- No hardcoded credentials or secrets
 
 ## 📝 License
 
@@ -170,6 +226,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with SwiftUI and SwiftData
 - Gutenberg editor inspiration from WordPress
 - Icons from SF Symbols
+- [iA Writer Fonts](https://github.com/iaolo/iA-Fonts) - Typography (MIT License)
 
 ## 📬 Contact
 
