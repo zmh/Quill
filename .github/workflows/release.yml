@@ -9,6 +9,8 @@ jobs:
   build-and-release:
     name: Build and Release macOS App
     runs-on: macos-14  # Latest macOS runner
+    permissions:
+      contents: write  # Required to create releases
 
     steps:
       - name: Checkout code
