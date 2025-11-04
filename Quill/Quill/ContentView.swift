@@ -314,7 +314,7 @@ struct PostsListView: View {
                         NotificationCenter.default.post(name: .openSettings, object: nil)
                     }) {
                         Image(systemName: "gear")
-                            .font(.system(size: 20))
+                            .font(.system(size: 17))
                     }
                     .buttonStyle(.borderless)
                     .help("Settings")
@@ -565,7 +565,7 @@ struct PostEditorView: View {
                 }
                 .popover(isPresented: $showMetadata, arrowEdge: .bottom) {
                     PostMetadataView(post: post)
-                        .frame(width: 360, height: 380)
+                        .frame(width: 360, height: 300)
                 }
             }
 
@@ -1061,7 +1061,7 @@ struct PostMetadataView: View {
     @Query private var siteConfigs: [SiteConfiguration]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // Title field
             HStack {
                 Text("Title:")
@@ -1110,10 +1110,10 @@ struct PostMetadataView: View {
                     Spacer()
                 }
             }
-            
+
             Divider()
-                .padding(.vertical, 4)
-            
+                .padding(.vertical, 2)
+
             HStack {
                 Text("Created:")
                     .frame(width: 80, alignment: .trailing)
@@ -1137,9 +1137,9 @@ struct PostMetadataView: View {
             // View/Edit on Site buttons
             if siteConfigs.first != nil, post.remoteID != nil {
                 Divider()
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 2)
 
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     Button(action: { previewPostInWordPress() }) {
                         HStack {
                             Image(systemName: "eye")
@@ -1164,7 +1164,7 @@ struct PostMetadataView: View {
 
             Spacer()
         }
-        .padding(20)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: post.status) { oldStatus, newStatus in
             handleStatusChange(from: oldStatus, to: newStatus)
@@ -1393,26 +1393,21 @@ struct ComposeWindow: View {
             }
 
             ToolbarItem(placement: .automatic) {
-                Button(action: { showMetadata.toggle() }) {
-                    Image(systemName: "info.circle")
+                Button(action: { createPost() }) {
+                    Image(systemName: "arrow.up.circle")
+                        .font(.system(size: 20))
                 }
-                .buttonStyle(.plain)
-                .popover(isPresented: $showMetadata) {
-                    ComposeMetadataView(status: $postStatus)
-                        .frame(width: 360, height: 200)
-                }
-            }
-
-            ToolbarItem(placement: .automatic) {
-                Button("Create") {
-                    createPost()
-                }
-                .buttonStyle(QuillButtonStyle())
+                .buttonStyle(.borderless)
+                .foregroundStyle(composeText.isEmpty ? Color.secondary : Color.blue)
                 .disabled(composeText.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
+                .help("Create post")
             }
         }
         .onAppear {
+            // Clear the text and reset state when the window appears
+            composeText = ""
+            postStatus = .draft
             isFocused = true
         }
     }
