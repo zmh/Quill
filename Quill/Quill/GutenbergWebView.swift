@@ -74,7 +74,16 @@ struct GutenbergWebView: View {
             // The coordinator will handle cleanup in its deinit
             #endif
         }
-        .onChange(of: post.id) { _, newPostID in
+        .onChange(of: post.id) { oldPostID, newPostID in
+            // IMPORTANT: Save pending changes BEFORE switching posts
+            // This prevents losing pasted content when quickly switching between posts
+            #if os(macOS)
+            if let webView = webViewRef as? GutenbergWKWebView,
+               let coordinator = webView.coordinator {
+                coordinator.savePendingChanges()
+            }
+            #endif
+
             // When post selection changes, trigger a refresh to decode HTML entities
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 // Small delay to ensure WebView is ready and content is loaded
@@ -258,13 +267,14 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 body {
                     margin: 0;
                     padding: 20px;
+                    padding-left: 40px;
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
                     background-color: var(--bg-color);
                     color: var(--text-color);
                     overflow-x: hidden;
                 }
-                
+
                 .editor-container {
                     max-width: 100%;
                     margin: 0 auto;
@@ -705,7 +715,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 }
             </style>
         </head>
-        <body>
+        <body data-typeface="\(typeface)">
             <div class="editor-container">
                 <div id="gutenberg-editor" class="loading">
                     Loading Gutenberg Editor...
@@ -825,17 +835,58 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 this.hasUserInteracted = true;
                                 this.shouldAutoFocus = true;
                             }
-                            
+
                             const blockElement = this.findBlockElementFromEvent(e);
                             if (blockElement) {
                                 const blockId = blockElement.getAttribute('data-block-id');
                                 this.setCurrentBlock(blockId);
-                                
+
                                 // Don't call focusBlock here - let the browser handle natural cursor placement
                                 // focusBlock always moves cursor to end, which interferes with clicking at specific positions
                             }
                         });
-                        
+
+                        // Handle paste events to properly parse multi-paragraph content
+                        this.blocksContainer.addEventListener('paste', (e) => {
+                            e.preventDefault();
+
+                            // Get pasted content
+                            const clipboardData = e.clipboardData || window.clipboardData;
+                            const pastedHTML = clipboardData.getData('text/html');
+                            const pastedText = clipboardData.getData('text/plain');
+
+                            window.webkit.messageHandlers.editorError.postMessage(`PASTE event: HTML length=${pastedHTML.length}, Text length=${pastedText.length}`);
+
+                            // Parse the pasted content into blocks
+                            const pastedBlocks = this.parsePastedContent(pastedHTML || pastedText);
+
+                            if (pastedBlocks.length === 0) return;
+
+                            // Find current block and position
+                            const selection = window.getSelection();
+                            const blockElement = selection.rangeCount > 0
+                                ? this.findBlockElementFromNode(selection.getRangeAt(0).startContainer)
+                                : null;
+
+                            let blockIndex = -1;
+                            if (!blockElement) {
+                                // No block found, append at end
+                                this.blocks.push(...pastedBlocks);
+                            } else {
+                                blockIndex = parseInt(blockElement.getAttribute('data-block-index'));
+
+                                // Insert pasted blocks after current block
+                                this.blocks.splice(blockIndex + 1, 0, ...pastedBlocks);
+                            }
+
+                            // Re-render and update
+                            this.render();
+                            this.handleContentChange();
+
+                            // Focus the last pasted block
+                            this.focusBlock(blockIndex !== -1 ? blockIndex + pastedBlocks.length : this.blocks.length - 1);
+                        });
+
                         // Handle focus events to detect user interaction
                         this.blocksContainer.addEventListener('focus', (e) => {
                             if (!this.hasUserInteracted) {
@@ -1057,10 +1108,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             }];
                             return;
                         }
-                        
+
                         // Parse HTML content into blocks
                         this.blocks = this.parseHTMLToBlocks(this.content);
-                        
+
                         if (this.blocks.length === 0) {
                             this.blocks = [{
                                 id: this.generateBlockId(),
@@ -1070,7 +1121,170 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                             }];
                         }
                     }
-                    
+
+                    parsePastedContent(content) {
+                        // Parse pasted HTML or text into block structures
+                        const blocks = [];
+
+                        if (!content || content.trim() === '') {
+                            return blocks;
+                        }
+
+                        // Check if content contains HTML tags
+                        const hasHTMLTags = /<[^>]+>/.test(content);
+
+                        if (hasHTMLTags) {
+                            // Parse as HTML
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = content;
+
+                            // Extract block-level elements
+                            const elements = tempDiv.children.length > 0 ? Array.from(tempDiv.children) : [];
+
+                            for (const element of elements) {
+                                const tagName = element.tagName ? element.tagName.toLowerCase() : 'p';
+                                const textContent = element.textContent || element.innerText || '';
+
+                                // Skip empty elements
+                                if (!textContent.trim()) continue;
+
+                                let blockType = 'paragraph';
+                                let blockContent = element.innerHTML || textContent;
+
+                                // Determine block type from tag
+                                if (tagName === 'h1') {
+                                    blockType = 'heading-1';
+                                } else if (tagName === 'h2') {
+                                    blockType = 'heading-2';
+                                } else if (tagName === 'h3') {
+                                    blockType = 'heading-3';
+                                } else if (tagName === 'h4') {
+                                    blockType = 'heading-4';
+                                } else if (tagName === 'h5') {
+                                    blockType = 'heading-5';
+                                } else if (tagName === 'h6') {
+                                    blockType = 'heading-6';
+                                } else if (tagName === 'pre' || tagName === 'code') {
+                                    blockType = 'code';
+                                    blockContent = textContent; // Use plain text for code
+                                } else if (tagName === 'blockquote') {
+                                    blockType = 'quote';
+                                } else if (tagName === 'ul') {
+                                    blockType = 'list';
+                                } else if (tagName === 'ol') {
+                                    blockType = 'ordered-list';
+                                }
+
+                                blocks.push({
+                                    id: this.generateBlockId(),
+                                    type: blockType,
+                                    content: blockContent,
+                                    attributes: {}
+                                });
+                            }
+                        } else {
+                            // Parse as plain text with full markdown support
+                            // Split by double newlines to get blocks
+                            const paragraphs = content.split(/\\n\\n+/);
+
+                            for (const para of paragraphs) {
+                                const trimmed = para.trim();
+                                if (!trimmed) continue;
+
+                                let blockType = 'paragraph';
+                                let blockContent = trimmed;
+
+                                // Detect horizontal rule (----)
+                                if (/^-{3,}$/.test(trimmed) || /^\\*{3,}$/.test(trimmed)) {
+                                    blocks.push({
+                                        id: this.generateBlockId(),
+                                        type: 'separator',
+                                        content: '<hr>',
+                                        attributes: {}
+                                    });
+                                    continue;
+                                }
+
+                                // Detect code blocks (```)
+                                if (trimmed.startsWith('```')) {
+                                    blockType = 'code';
+                                    // Remove opening and closing ```
+                                    blockContent = trimmed.replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '');
+                                }
+                                // Detect headings (# ## ### #### #####)
+                                else if (trimmed.startsWith('##### ')) {
+                                    blockType = 'heading-5';
+                                    blockContent = trimmed.substring(6).trim();
+                                }
+                                else if (trimmed.startsWith('#### ')) {
+                                    blockType = 'heading-4';
+                                    blockContent = trimmed.substring(5).trim();
+                                }
+                                else if (trimmed.startsWith('### ')) {
+                                    blockType = 'heading-3';
+                                    blockContent = trimmed.substring(4).trim();
+                                }
+                                else if (trimmed.startsWith('## ')) {
+                                    blockType = 'heading-2';
+                                    blockContent = trimmed.substring(3).trim();
+                                }
+                                else if (trimmed.startsWith('# ')) {
+                                    blockType = 'heading-1';
+                                    blockContent = trimmed.substring(2).trim();
+                                }
+                                // Detect blockquote (>)
+                                else if (trimmed.startsWith('> ')) {
+                                    blockType = 'quote';
+                                    blockContent = trimmed.substring(2).trim();
+                                }
+                                // Detect unordered list (- item)
+                                else if (/^[-*+]\\s/.test(trimmed)) {
+                                    blockType = 'list';
+                                    // Convert markdown list to HTML list items
+                                    const items = trimmed.split(/\\n[-*+]\\s/);
+                                    blockContent = '<li>' + items.join('</li><li>').replace(/^[-*+]\\s/, '') + '</li>';
+                                }
+                                // Detect ordered list (1. item)
+                                else if (/^\\d+\\.\\s/.test(trimmed)) {
+                                    blockType = 'ordered-list';
+                                    // Convert markdown list to HTML list items
+                                    const items = trimmed.split(/\\n\\d+\\.\\s/);
+                                    blockContent = '<li>' + items.join('</li><li>').replace(/^\\d+\\.\\s/, '') + '</li>';
+                                }
+                                else {
+                                    // Regular paragraph - convert single newlines to <br> tags
+                                    blockContent = trimmed.replace(/\\n/g, '<br>');
+                                }
+
+                                // Apply inline markdown formatting (for non-code blocks)
+                                if (blockType !== 'code') {
+                                    // Links [text](url)
+                                    blockContent = blockContent.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>');
+
+                                    // Inline code `code`
+                                    blockContent = blockContent.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+                                    // Bold **text** or __text__
+                                    blockContent = blockContent.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+                                    blockContent = blockContent.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+                                    // Italics *text* or _text_ (but not if already part of **)
+                                    blockContent = blockContent.replace(/(?<!\\*)\\*(?!\\*)([^*]+)\\*(?!\\*)/g, '<em>$1</em>');
+                                    blockContent = blockContent.replace(/(?<!_)_(?!_)([^_]+)_(?!_)/g, '<em>$1</em>');
+                                }
+
+                                blocks.push({
+                                    id: this.generateBlockId(),
+                                    type: blockType,
+                                    content: blockContent,
+                                    attributes: {}
+                                });
+                            }
+                        }
+
+                        return blocks;
+                    }
+
                     render() {
                         // Save current block before clearing
                         const previousCurrentBlock = this.currentBlock;
@@ -1203,7 +1417,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 const citation = block.attributes && block.attributes.citation
                                     ? `<cite>${this.escapeHtml(block.attributes.citation)}</cite>`
                                     : '';
-                                content = `<blockquote class="wp-block-quote"><!-- wp:paragraph --> ${quoteContent} <!-- /wp:paragraph -->${citation}</blockquote>`;
+                                content = `<blockquote class="wp-block-quote">${quoteContent}${citation}</blockquote>`;
                             } else {
                                 const tagName = this.getBlockTagName(block.type) || 'p';
                                 content = `<${tagName}>${block.content}</${tagName}>`;
@@ -2612,7 +2826,7 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 const citation = block.attributes && block.attributes.citation
                                     ? `<cite>${this.escapeHtml(block.attributes.citation)}</cite>`
                                     : '';
-                                content = `<blockquote class="wp-block-quote"><!-- wp:paragraph --> ${quoteContent} <!-- /wp:paragraph -->${citation}</blockquote>`;
+                                content = `<blockquote class="wp-block-quote">${quoteContent}${citation}</blockquote>`;
                             } else {
                                 const tagName = this.getBlockTagName(block.type) || 'p';
                                 content = `<${tagName}>${block.content}</${tagName}>`;
@@ -2657,30 +2871,56 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
         private var lastPendingContent: String?
-        
+        private var pendingContentPostID: UUID?
+
         init(_ parent: GutenbergWebViewRepresentable) {
             self.parent = parent
         }
-        
+
         deinit {
             // Save any pending changes before deallocation
             savePendingChanges()
         }
-        
+
         func savePendingChanges() {
             // Cancel timer and save immediately
             contentUpdateTimer?.invalidate()
             contentUpdateTimer = nil
-            
+
             // If we have pending content, save it immediately
-            if let pendingContent = lastPendingContent {
-                DispatchQueue.main.async {
-                    self.parent.post.content = pendingContent
-                    self.parent.post.modifiedDate = Date()
+            if let pendingContent = lastPendingContent,
+               let postID = pendingContentPostID {
+
+                // Find the post that this content belongs to
+                // If parent.post has the same ID, use it; otherwise we lost the reference
+                let targetPost = parent.post.id == postID ? parent.post : nil
+
+                guard let targetPost = targetPost else {
+                    DebugLogger.shared.log("Warning: Could not save pending changes - post reference lost", level: .warning, source: "WebView")
                     self.lastPendingContent = nil
-                    
+                    self.pendingContentPostID = nil
+                    return
+                }
+
+                // Save synchronously if already on main thread, otherwise dispatch
+                if Thread.isMainThread {
+                    targetPost.content = pendingContent
+                    targetPost.modifiedDate = Date()
+                    self.lastPendingContent = nil
+                    self.pendingContentPostID = nil
+
                     // SwiftData automatically saves changes
-                    DebugLogger.shared.log("Saved pending changes on cleanup", level: .debug, source: "WebView")
+                    DebugLogger.shared.log("Saved pending changes on cleanup (sync) for post: \\(targetPost.title)", level: .debug, source: "WebView")
+                } else {
+                    DispatchQueue.main.async {
+                        targetPost.content = pendingContent
+                        targetPost.modifiedDate = Date()
+                        self.lastPendingContent = nil
+                        self.pendingContentPostID = nil
+
+                        // SwiftData automatically saves changes
+                        DebugLogger.shared.log("Saved pending changes on cleanup (async) for post: \\(targetPost.title)", level: .debug, source: "WebView")
+                    }
                 }
             }
         }
@@ -2768,9 +3008,10 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                 DebugLogger.shared.log("Content contains HTML entities", level: .warning, source: "GutenbergWebView")
             }
             
-            // Store the pending content
+            // Store the pending content AND which post it belongs to
             lastPendingContent = html
-            
+            pendingContentPostID = parent.post.id
+
             // Debounce content updates
             contentUpdateTimer?.invalidate()
             contentUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
@@ -3638,13 +3879,14 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 body {
                     margin: 0;
                     padding: 20px;
+                    padding-left: 40px;
                     font-family: var(--editor-font-family);
                     font-size: var(--editor-font-size);
                     background-color: var(--bg-color);
                     color: var(--text-color);
                     overflow-x: hidden;
                 }
-                
+
                 .editor-container {
                     max-width: 100%;
                     margin: 0 auto;
@@ -3706,12 +3948,37 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 /* List items with better spacing */
                 ul, ol {
                     margin: 0.3em 0;
-                    padding-left: 1.5em;
+                    padding-left: 3em;
+                    margin-left: 0.5em;
+                    list-style-position: outside;
                 }
-                
+
                 li {
                     line-height: 1.6;
                     margin: 0.2em 0;
+                    padding-left: 0.5em;
+                }
+
+                /* Monospace fonts: move markers inside to prevent clipping */
+                body[data-typeface="sf-mono"] ul,
+                body[data-typeface="sf-mono"] ol,
+                body[data-typeface="ia-mono"] ul,
+                body[data-typeface="ia-mono"] ol,
+                body[data-typeface="ia-duo"] ul,
+                body[data-typeface="ia-duo"] ol,
+                body[data-typeface="ia-quattro"] ul,
+                body[data-typeface="ia-quattro"] ol {
+                    list-style-position: inside;
+                    padding-left: 1em;
+                    margin-left: 0;
+                }
+
+                body[data-typeface="sf-mono"] li,
+                body[data-typeface="ia-mono"] li,
+                body[data-typeface="ia-duo"] li,
+                body[data-typeface="ia-quattro"] li {
+                    padding-left: 0.75em;
+                    text-indent: -0.1em;
                 }
                 
                 /* Code blocks should always use monospace */
@@ -4005,7 +4272,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 }
             </style>
         </head>
-        <body>
+        <body data-typeface="\(typeface)">
             <div class="editor-container">
                 <div id="gutenberg-editor" class="loading">
                     Loading Gutenberg Editor...
@@ -4128,17 +4395,58 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 this.hasUserInteracted = true;
                                 this.shouldAutoFocus = true;
                             }
-                            
+
                             const blockElement = this.findBlockElementFromEvent(e);
                             if (blockElement) {
                                 const blockId = blockElement.getAttribute('data-block-id');
                                 this.setCurrentBlock(blockId);
-                                
+
                                 // Don't call focusBlock here - let the browser handle natural cursor placement
                                 // focusBlock always moves cursor to end, which interferes with clicking at specific positions
                             }
                         });
-                        
+
+                        // Handle paste events to properly parse multi-paragraph content
+                        this.blocksContainer.addEventListener('paste', (e) => {
+                            e.preventDefault();
+
+                            // Get pasted content
+                            const clipboardData = e.clipboardData || window.clipboardData;
+                            const pastedHTML = clipboardData.getData('text/html');
+                            const pastedText = clipboardData.getData('text/plain');
+
+                            window.webkit.messageHandlers.editorError.postMessage(`PASTE event: HTML length=${pastedHTML.length}, Text length=${pastedText.length}`);
+
+                            // Parse the pasted content into blocks
+                            const pastedBlocks = this.parsePastedContent(pastedHTML || pastedText);
+
+                            if (pastedBlocks.length === 0) return;
+
+                            // Find current block and position
+                            const selection = window.getSelection();
+                            const blockElement = selection.rangeCount > 0
+                                ? this.findBlockElementFromNode(selection.getRangeAt(0).startContainer)
+                                : null;
+
+                            let blockIndex = -1;
+                            if (!blockElement) {
+                                // No block found, append at end
+                                this.blocks.push(...pastedBlocks);
+                            } else {
+                                blockIndex = parseInt(blockElement.getAttribute('data-block-index'));
+
+                                // Insert pasted blocks after current block
+                                this.blocks.splice(blockIndex + 1, 0, ...pastedBlocks);
+                            }
+
+                            // Re-render and update
+                            this.render();
+                            this.handleContentChange();
+
+                            // Focus the last pasted block
+                            this.focusBlock(blockIndex !== -1 ? blockIndex + pastedBlocks.length : this.blocks.length - 1);
+                        });
+
                         // Handle focus events to detect user interaction
                         this.blocksContainer.addEventListener('focus', (e) => {
                             if (!this.hasUserInteracted) {
@@ -4360,10 +4668,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             }];
                             return;
                         }
-                        
+
                         // Parse HTML content into blocks
                         this.blocks = this.parseHTMLToBlocks(this.content);
-                        
+
                         if (this.blocks.length === 0) {
                             this.blocks = [{
                                 id: this.generateBlockId(),
@@ -4373,7 +4681,170 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                             }];
                         }
                     }
-                    
+
+                    parsePastedContent(content) {
+                        // Parse pasted HTML or text into block structures
+                        const blocks = [];
+
+                        if (!content || content.trim() === '') {
+                            return blocks;
+                        }
+
+                        // Check if content contains HTML tags
+                        const hasHTMLTags = /<[^>]+>/.test(content);
+
+                        if (hasHTMLTags) {
+                            // Parse as HTML
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = content;
+
+                            // Extract block-level elements
+                            const elements = tempDiv.children.length > 0 ? Array.from(tempDiv.children) : [];
+
+                            for (const element of elements) {
+                                const tagName = element.tagName ? element.tagName.toLowerCase() : 'p';
+                                const textContent = element.textContent || element.innerText || '';
+
+                                // Skip empty elements
+                                if (!textContent.trim()) continue;
+
+                                let blockType = 'paragraph';
+                                let blockContent = element.innerHTML || textContent;
+
+                                // Determine block type from tag
+                                if (tagName === 'h1') {
+                                    blockType = 'heading-1';
+                                } else if (tagName === 'h2') {
+                                    blockType = 'heading-2';
+                                } else if (tagName === 'h3') {
+                                    blockType = 'heading-3';
+                                } else if (tagName === 'h4') {
+                                    blockType = 'heading-4';
+                                } else if (tagName === 'h5') {
+                                    blockType = 'heading-5';
+                                } else if (tagName === 'h6') {
+                                    blockType = 'heading-6';
+                                } else if (tagName === 'pre' || tagName === 'code') {
+                                    blockType = 'code';
+                                    blockContent = textContent; // Use plain text for code
+                                } else if (tagName === 'blockquote') {
+                                    blockType = 'quote';
+                                } else if (tagName === 'ul') {
+                                    blockType = 'list';
+                                } else if (tagName === 'ol') {
+                                    blockType = 'ordered-list';
+                                }
+
+                                blocks.push({
+                                    id: this.generateBlockId(),
+                                    type: blockType,
+                                    content: blockContent,
+                                    attributes: {}
+                                });
+                            }
+                        } else {
+                            // Parse as plain text with full markdown support
+                            // Split by double newlines to get blocks
+                            const paragraphs = content.split(/\\n\\n+/);
+
+                            for (const para of paragraphs) {
+                                const trimmed = para.trim();
+                                if (!trimmed) continue;
+
+                                let blockType = 'paragraph';
+                                let blockContent = trimmed;
+
+                                // Detect horizontal rule (----)
+                                if (/^-{3,}$/.test(trimmed) || /^\\*{3,}$/.test(trimmed)) {
+                                    blocks.push({
+                                        id: this.generateBlockId(),
+                                        type: 'separator',
+                                        content: '<hr>',
+                                        attributes: {}
+                                    });
+                                    continue;
+                                }
+
+                                // Detect code blocks (```)
+                                if (trimmed.startsWith('```')) {
+                                    blockType = 'code';
+                                    // Remove opening and closing ```
+                                    blockContent = trimmed.replace(/^```[a-z]*\\n?/, '').replace(/\\n?```$/, '');
+                                }
+                                // Detect headings (# ## ### #### #####)
+                                else if (trimmed.startsWith('##### ')) {
+                                    blockType = 'heading-5';
+                                    blockContent = trimmed.substring(6).trim();
+                                }
+                                else if (trimmed.startsWith('#### ')) {
+                                    blockType = 'heading-4';
+                                    blockContent = trimmed.substring(5).trim();
+                                }
+                                else if (trimmed.startsWith('### ')) {
+                                    blockType = 'heading-3';
+                                    blockContent = trimmed.substring(4).trim();
+                                }
+                                else if (trimmed.startsWith('## ')) {
+                                    blockType = 'heading-2';
+                                    blockContent = trimmed.substring(3).trim();
+                                }
+                                else if (trimmed.startsWith('# ')) {
+                                    blockType = 'heading-1';
+                                    blockContent = trimmed.substring(2).trim();
+                                }
+                                // Detect blockquote (>)
+                                else if (trimmed.startsWith('> ')) {
+                                    blockType = 'quote';
+                                    blockContent = trimmed.substring(2).trim();
+                                }
+                                // Detect unordered list (- item)
+                                else if (/^[-*+]\\s/.test(trimmed)) {
+                                    blockType = 'list';
+                                    // Convert markdown list to HTML list items
+                                    const items = trimmed.split(/\\n[-*+]\\s/);
+                                    blockContent = '<li>' + items.join('</li><li>').replace(/^[-*+]\\s/, '') + '</li>';
+                                }
+                                // Detect ordered list (1. item)
+                                else if (/^\\d+\\.\\s/.test(trimmed)) {
+                                    blockType = 'ordered-list';
+                                    // Convert markdown list to HTML list items
+                                    const items = trimmed.split(/\\n\\d+\\.\\s/);
+                                    blockContent = '<li>' + items.join('</li><li>').replace(/^\\d+\\.\\s/, '') + '</li>';
+                                }
+                                else {
+                                    // Regular paragraph - convert single newlines to <br> tags
+                                    blockContent = trimmed.replace(/\\n/g, '<br>');
+                                }
+
+                                // Apply inline markdown formatting (for non-code blocks)
+                                if (blockType !== 'code') {
+                                    // Links [text](url)
+                                    blockContent = blockContent.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>');
+
+                                    // Inline code `code`
+                                    blockContent = blockContent.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+                                    // Bold **text** or __text__
+                                    blockContent = blockContent.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+                                    blockContent = blockContent.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+                                    // Italics *text* or _text_ (but not if already part of **)
+                                    blockContent = blockContent.replace(/(?<!\\*)\\*(?!\\*)([^*]+)\\*(?!\\*)/g, '<em>$1</em>');
+                                    blockContent = blockContent.replace(/(?<!_)_(?!_)([^_]+)_(?!_)/g, '<em>$1</em>');
+                                }
+
+                                blocks.push({
+                                    id: this.generateBlockId(),
+                                    type: blockType,
+                                    content: blockContent,
+                                    attributes: {}
+                                });
+                            }
+                        }
+
+                        return blocks;
+                    }
+
                     render() {
                         // Save current block before clearing
                         const previousCurrentBlock = this.currentBlock;
@@ -4506,7 +4977,7 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 const citation = block.attributes && block.attributes.citation
                                     ? `<cite>${this.escapeHtml(block.attributes.citation)}</cite>`
                                     : '';
-                                content = `<blockquote class="wp-block-quote"><!-- wp:paragraph --> ${quoteContent} <!-- /wp:paragraph -->${citation}</blockquote>`;
+                                content = `<blockquote class="wp-block-quote">${quoteContent}${citation}</blockquote>`;
                             } else {
                                 const tagName = this.getBlockTagName(block.type) || 'p';
                                 content = `<${tagName}>${block.content}</${tagName}>`;
@@ -5636,31 +6107,57 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
         var parent: GutenbergWebViewRepresentable
         private var contentUpdateTimer: Timer?
         private var lastPendingContent: String?
+        private var pendingContentPostID: UUID?
         private var linkPopover: NSPopover?
 
         init(_ parent: GutenbergWebViewRepresentable) {
             self.parent = parent
         }
-        
+
         deinit {
             // Save any pending changes before deallocation
             savePendingChanges()
         }
-        
+
         func savePendingChanges() {
             // Cancel timer and save immediately
             contentUpdateTimer?.invalidate()
             contentUpdateTimer = nil
-            
+
             // If we have pending content, save it immediately
-            if let pendingContent = lastPendingContent {
-                DispatchQueue.main.async {
-                    self.parent.post.content = pendingContent
-                    self.parent.post.modifiedDate = Date()
+            if let pendingContent = lastPendingContent,
+               let postID = pendingContentPostID {
+
+                // Find the post that this content belongs to
+                // If parent.post has the same ID, use it; otherwise we lost the reference
+                let targetPost = parent.post.id == postID ? parent.post : nil
+
+                guard let targetPost = targetPost else {
+                    DebugLogger.shared.log("Warning: Could not save pending changes - post reference lost", level: .warning, source: "WebView")
                     self.lastPendingContent = nil
-                    
+                    self.pendingContentPostID = nil
+                    return
+                }
+
+                // Save synchronously if already on main thread, otherwise dispatch
+                if Thread.isMainThread {
+                    targetPost.content = pendingContent
+                    targetPost.modifiedDate = Date()
+                    self.lastPendingContent = nil
+                    self.pendingContentPostID = nil
+
                     // SwiftData automatically saves changes
-                    DebugLogger.shared.log("Saved pending changes on cleanup", level: .debug, source: "WebView")
+                    DebugLogger.shared.log("Saved pending changes on cleanup (sync) for post: \\(targetPost.title)", level: .debug, source: "WebView")
+                } else {
+                    DispatchQueue.main.async {
+                        targetPost.content = pendingContent
+                        targetPost.modifiedDate = Date()
+                        self.lastPendingContent = nil
+                        self.pendingContentPostID = nil
+
+                        // SwiftData automatically saves changes
+                        DebugLogger.shared.log("Saved pending changes on cleanup (async) for post: \\(targetPost.title)", level: .debug, source: "WebView")
+                    }
                 }
             }
         }
@@ -5744,9 +6241,10 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                 DebugLogger.shared.log("Content contains HTML entities", level: .warning, source: "GutenbergWebView")
             }
             
-            // Store the pending content
+            // Store the pending content AND which post it belongs to
             lastPendingContent = html
-            
+            pendingContentPostID = parent.post.id
+
             // Debounce content updates
             contentUpdateTimer?.invalidate()
             contentUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
