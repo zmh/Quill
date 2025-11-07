@@ -158,29 +158,37 @@ jobs:
           RELEASE_NOTES=$(sed -n '/## What'\''s Changed/,/## Installation/{/## What'\''s Changed/d;/## Installation/d;p;}' release_notes.md | head -5 | sed 's/^- \(.*\) ([a-f0-9]*)/                    <li>\1<\/li>/')
 
           # Create new item XML
-          NEW_ITEM=$(cat <<EOF
+          NEW_ITEM=$(cat <<'APPCAST_EOF'
         <item>
-            <title>Version ${VERSION}</title>
-            <pubDate>${DATE}</pubDate>
-            <sparkle:version>${VERSION}</sparkle:version>
-            <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+            <title>Version VERSION_PLACEHOLDER</title>
+            <pubDate>DATE_PLACEHOLDER</pubDate>
+            <sparkle:version>VERSION_PLACEHOLDER</sparkle:version>
+            <sparkle:shortVersionString>VERSION_PLACEHOLDER</sparkle:shortVersionString>
             <description><![CDATA[
-                <h2>What's New in ${VERSION}</h2>
+                <h2>What's New in VERSION_PLACEHOLDER</h2>
                 <ul>
-${RELEASE_NOTES}
+RELEASE_NOTES_PLACEHOLDER
                 </ul>
-                <p>See the <a href="https://github.com/${{ github.repository }}/releases/tag/v${VERSION}">full release notes</a> for details.</p>
+                <p>See the <a href="REPO_URL_PLACEHOLDER">full release notes</a> for details.</p>
             ]]></description>
             <enclosure
-                url="${DOWNLOAD_URL}"
-                length="${DMG_SIZE}"
+                url="DOWNLOAD_URL_PLACEHOLDER"
+                length="DMG_SIZE_PLACEHOLDER"
                 type="application/octet-stream"
             />
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
         </item>
 
-EOF
+APPCAST_EOF
 )
+
+          # Replace placeholders
+          NEW_ITEM="${NEW_ITEM//VERSION_PLACEHOLDER/$VERSION}"
+          NEW_ITEM="${NEW_ITEM//DATE_PLACEHOLDER/$DATE}"
+          NEW_ITEM="${NEW_ITEM//RELEASE_NOTES_PLACEHOLDER/$RELEASE_NOTES}"
+          NEW_ITEM="${NEW_ITEM//REPO_URL_PLACEHOLDER/https://github.com/${{ github.repository }}/releases/tag/v${VERSION}}"
+          NEW_ITEM="${NEW_ITEM//DOWNLOAD_URL_PLACEHOLDER/$DOWNLOAD_URL}"
+          NEW_ITEM="${NEW_ITEM//DMG_SIZE_PLACEHOLDER/$DMG_SIZE}"
 
           # Insert new item after the comment block and before the first existing item
           # Using awk to find the insertion point
