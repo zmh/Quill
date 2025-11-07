@@ -19,19 +19,6 @@
         -->
 
         <item>
-            <item xmlns:ns0="http://www.andymatuschak.org/xml-namespaces/sparkle"><title>Version 1.0.6</title><pubDate>Fri, 07 Nov 2025 20:57:08 +0000</pubDate><ns0:version>1.0.6</ns0:version><ns0:shortVersionString>1.0.6</ns0:shortVersionString><description>
-            &lt;h2&gt;What's New in 1.0.6&lt;/h2&gt;
-            &lt;ul&gt;
-            &lt;li&gt;Bump version to 1.0.6 for automation test&lt;/li&gt;
-            &lt;li&gt;Remove special character causing YAML syntax error&lt;/li&gt;
-            &lt;li&gt;Fix YAML syntax error with single-line commit message&lt;/li&gt;
-            &lt;li&gt;Add v1.0.5 to appcast and automate future updates&lt;/li&gt;
-            &lt;/ul&gt;
-            &lt;p&gt;See the &lt;a href="https://github.com/zmh/Quill/releases/tag/v1.0.6"&gt;full release notes&lt;/a&gt; for details.&lt;/p&gt;
-            </description><enclosure url="https://github.com/zmh/Quill/releases/download/v1.0.6/Quill-1.0.6.dmg" length="3517425" type="application/octet-stream" /><ns0:minimumSystemVersion>14.0</ns0:minimumSystemVersion></item>
-        </item>
-
-        <item>
             <title>Version 1.0.5</title>
             <pubDate>Thu, 07 Nov 2025 19:49:39 +0000</pubDate>
             <sparkle:version>1.0.5</sparkle:version>

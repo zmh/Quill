@@ -41,51 +41,36 @@ def parse_release_notes(release_notes_file):
 
     return notes[:5] if notes else ["See the full release notes for details."]
 
-def create_item_element(version, dmg_size, release_notes, repo="zmh/quill"):
-    """Create a new <item> element for the appcast."""
-    # Create item with proper namespace
-    item = ET.Element('item')
-
-    # Title
-    title = ET.SubElement(item, 'title')
-    title.text = f'Version {version}'
-
+def create_item_xml(version, dmg_size, release_notes, repo="zmh/quill"):
+    """Create a new <item> XML string for the appcast."""
     # Publication date (RFC 822 format)
-    pub_date = ET.SubElement(item, 'pubDate')
-    pub_date.text = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
+    pub_date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
 
-    # Sparkle version tags
-    sparkle_ns = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
-
-    version_elem = ET.SubElement(item, f'{sparkle_ns}version')
-    version_elem.text = version
-
-    short_version = ET.SubElement(item, f'{sparkle_ns}shortVersionString')
-    short_version.text = version
-
-    # Description with CDATA
-    description = ET.SubElement(item, 'description')
+    # Format release notes as HTML list items
     notes_html = '\n'.join([f'                    <li>{note}</li>' for note in release_notes])
-    cdata_content = f"""
+
+    # Build the XML string manually to match the existing format exactly
+    item_xml = f"""        <item>
+            <title>Version {version}</title>
+            <pubDate>{pub_date}</pubDate>
+            <sparkle:version>{version}</sparkle:version>
+            <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
+            <description><![CDATA[
                 <h2>What's New in {version}</h2>
                 <ul>
 {notes_html}
                 </ul>
                 <p>See the <a href="https://github.com/{repo}/releases/tag/v{version}">full release notes</a> for details.</p>
-            """
-    description.text = cdata_content
+            ]]></description>
+            <enclosure
+                url="https://github.com/{repo}/releases/download/v{version}/Quill-{version}.dmg"
+                length="{dmg_size}"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>"""
 
-    # Enclosure (DMG download)
-    enclosure = ET.SubElement(item, 'enclosure')
-    enclosure.set('url', f'https://github.com/{repo}/releases/download/v{version}/Quill-{version}.dmg')
-    enclosure.set('length', str(dmg_size))
-    enclosure.set('type', 'application/octet-stream')
-
-    # Minimum system version
-    min_version = ET.SubElement(item, f'{sparkle_ns}minimumSystemVersion')
-    min_version.text = '14.0'
-
-    return item
+    return item_xml
 
 def update_appcast(appcast_file, version, dmg_size, release_notes_file, repo="zmh/quill"):
     """Update the appcast.xml file with a new release."""
@@ -96,24 +81,8 @@ def update_appcast(appcast_file, version, dmg_size, release_notes_file, repo="zm
     # Parse release notes
     release_notes = parse_release_notes(release_notes_file)
 
-    # Create new item XML
-    new_item = create_item_element(version, dmg_size, release_notes, repo)
-
-    # Convert to string with proper formatting
-    item_str = ET.tostring(new_item, encoding='unicode', method='xml')
-
-    # Format the item XML nicely
-    item_lines = []
-    item_lines.append('        <item>')
-
-    # Parse and format each sub-element
-    for line in item_str.split('\n'):
-        line = line.strip()
-        if line and line != '<item>' and line != '</item>':
-            item_lines.append('            ' + line)
-
-    item_lines.append('        </item>')
-    new_item_xml = '\n'.join(item_lines)
+    # Create new item XML (as a formatted string)
+    new_item_xml = create_item_xml(version, dmg_size, release_notes, repo)
 
     # Find the insertion point (after the comment block, before first existing item)
     # Look for the end of the comment block (-->)
