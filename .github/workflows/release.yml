@@ -179,13 +179,18 @@ jobs:
           curl -L -o "$RUNNER_TEMP/sparkle.tar.xz" "$SPARKLE_URL"
           tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP"
 
-          SIGN_UPDATE="$RUNNER_TEMP/bin/sign_update"
+          # Find sign_update tool (it's in Sparkle.framework/Resources/bin/)
+          SIGN_UPDATE=$(find "$RUNNER_TEMP" -name "sign_update" -type f | head -1)
 
           if [ ! -f "$SIGN_UPDATE" ]; then
             echo "Error: sign_update tool not found"
-            ls -la "$RUNNER_TEMP/bin/" || echo "bin directory not found"
+            echo "Contents of RUNNER_TEMP:"
+            ls -laR "$RUNNER_TEMP" | head -100
             exit 1
           fi
+
+          echo "Found sign_update at: $SIGN_UPDATE"
+          chmod +x "$SIGN_UPDATE"
 
           # Write private key to temporary file
           PRIVATE_KEY_PATH="$RUNNER_TEMP/sparkle_private_key"
