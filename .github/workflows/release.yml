@@ -135,90 +135,6 @@ jobs:
           name: appcast
           path: build/appcast/appcast.xml
 
-      - name: Update Appcast in Repository
-        run: |
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Get current branch/commit (we're in detached HEAD from tag checkout)
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-
-          # Fetch and checkout main branch
-          git fetch origin main
-          git checkout main
-
-          # Generate the new appcast item
-          VERSION="${{ steps.version.outputs.version }}"
-          DMG_SIZE=$(stat -f%z "build/Quill-${VERSION}.dmg")
-          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/Quill-${VERSION}.dmg"
-
-          # Get release notes from the release_notes.md (first 5 lines after "What's Changed")
-          RELEASE_NOTES=$(sed -n '/## What'\''s Changed/,/## Installation/{/## What'\''s Changed/d;/## Installation/d;p;}' release_notes.md | head -5 | sed 's/^- \(.*\) ([a-f0-9]*)/                    <li>\1<\/li>/')
-
-          # Create new item XML
-          NEW_ITEM=$(cat <<'APPCAST_EOF'
-        <item>
-            <title>Version VERSION_PLACEHOLDER</title>
-            <pubDate>DATE_PLACEHOLDER</pubDate>
-            <sparkle:version>VERSION_PLACEHOLDER</sparkle:version>
-            <sparkle:shortVersionString>VERSION_PLACEHOLDER</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>What's New in VERSION_PLACEHOLDER</h2>
-                <ul>
-RELEASE_NOTES_PLACEHOLDER
-                </ul>
-                <p>See the <a href="REPO_URL_PLACEHOLDER">full release notes</a> for details.</p>
-            ]]></description>
-            <enclosure
-                url="DOWNLOAD_URL_PLACEHOLDER"
-                length="DMG_SIZE_PLACEHOLDER"
-                type="application/octet-stream"
-            />
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-        </item>
-
-APPCAST_EOF
-)
-
-          # Replace placeholders
-          NEW_ITEM="${NEW_ITEM//VERSION_PLACEHOLDER/$VERSION}"
-          NEW_ITEM="${NEW_ITEM//DATE_PLACEHOLDER/$DATE}"
-          NEW_ITEM="${NEW_ITEM//RELEASE_NOTES_PLACEHOLDER/$RELEASE_NOTES}"
-          NEW_ITEM="${NEW_ITEM//REPO_URL_PLACEHOLDER/https://github.com/${{ github.repository }}/releases/tag/v${VERSION}}"
-          NEW_ITEM="${NEW_ITEM//DOWNLOAD_URL_PLACEHOLDER/$DOWNLOAD_URL}"
-          NEW_ITEM="${NEW_ITEM//DMG_SIZE_PLACEHOLDER/$DMG_SIZE}"
-
-          # Insert new item after the comment block and before the first existing item
-          # Using awk to find the insertion point
-          awk -v new_item="$NEW_ITEM" '
-            /-->/ && !inserted {
-              print;
-              print "";
-              print new_item;
-              inserted=1;
-              next
-            }
-            { print }
-          ' appcast.xml > appcast.xml.tmp
-
-          mv appcast.xml.tmp appcast.xml
-
-          # Commit and push if there are changes
-          if git diff --quiet appcast.xml; then
-            echo "No changes to appcast.xml"
-          else
-            git add appcast.xml
-            git commit -m "Update appcast.xml for v${VERSION}
-
-Automatically updated by GitHub Actions release workflow.
-
-Release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
-            git push origin main
-            echo "✓ Appcast updated and pushed to main branch"
-          fi
-
   notify:
     name: Notify Release Complete
     needs: build-and-release
@@ -232,5 +148,5 @@ Release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
           echo "1. Test the release by downloading from GitHub" >> $GITHUB_STEP_SUMMARY
-          echo "2. ✅ appcast.xml automatically updated on main branch" >> $GITHUB_STEP_SUMMARY
+          echo "2. Download appcast artifact and update appcast.xml in main branch" >> $GITHUB_STEP_SUMMARY
           echo "3. Announce the release to users" >> $GITHUB_STEP_SUMMARY
