@@ -5,6 +5,11 @@
 ## User settings
 xcuserdata/
 
+## Backup files
+*.backup
+*.bak
+*~
+
 ## Xcode 8 and earlier
 *.xcscmblueprint
 *.xccheckout
@@ -131,6 +136,22 @@ release_notes.md
 dsa_priv.pem
 ed25519_priv.pem
 sparkle_private_key
+
+# Local development configuration (IMPORTANT: Never commit developer credentials!)
+Config/Local.xcconfig
+*.xcconfig
+!*.xcconfig.example
+
+# Code signing certificates and profiles
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# Environment files with secrets
+.env
+.env.local
+*.env
 
 # Claude settings (optional - remove this line if you want to track Claude settings)
 .claude/settings.local.json

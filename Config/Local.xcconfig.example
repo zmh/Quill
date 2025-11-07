@@ -1,0 +1,19 @@
+// Local.xcconfig.example
+//
+// This is a template for your local development configuration.
+// Copy this file to Local.xcconfig and fill in your own values.
+//
+// IMPORTANT: Local.xcconfig is gitignored and will not be committed.
+
+// Your Apple Developer Team ID
+// Find this at: https://developer.apple.com/account/#!/membership
+DEVELOPMENT_TEAM = YOUR_TEAM_ID_HERE
+
+// Your Developer ID Application certificate name (for release builds)
+// Format: "Developer ID Application: Your Name or Company (TEAM_ID)"
+// Leave empty if you don't have a Developer ID certificate
+CODE_SIGN_IDENTITY_RELEASE =
+
+// Your signing identity for debug builds
+// Usually "Apple Development" for automatic signing
+CODE_SIGN_IDENTITY_DEBUG = Apple Development
