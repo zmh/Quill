@@ -24,6 +24,14 @@ ARCHIVE_PATH="$BUILD_DIR/Quill.xcarchive"
 EXPORT_PATH="$BUILD_DIR/Release"
 APP_NAME="Quill.app"
 
+# Developer credentials (from environment or Config/Local.xcconfig)
+# These should be set in your environment or in Config/Local.xcconfig
+# DEVELOPMENT_TEAM: Your Apple Developer Team ID
+# CODE_SIGN_IDENTITY: Your signing certificate name
+#
+# For local builds, create Config/Local.xcconfig from Config/Local.xcconfig.example
+# For CI/CD, set SKIP_CODESIGN=true to build unsigned binaries
+
 # Get version from argument or use default
 VERSION=${1:-"1.0.0"}
 
@@ -55,6 +63,26 @@ if [ "$SKIP_CODESIGN" = "true" ]; then
         CODE_SIGNING_ALLOWED=NO \
         -allowProvisioningUpdates
 else
+    # Use environment variables for signing
+    # If not set, xcodebuild will use values from Config/Local.xcconfig or Xcode project
+    if [ -z "$DEVELOPMENT_TEAM" ]; then
+        echo -e "${RED}Error: DEVELOPMENT_TEAM environment variable not set${NC}"
+        echo "Please set DEVELOPMENT_TEAM or create Config/Local.xcconfig"
+        echo "See Config/Local.xcconfig.example for template"
+        exit 1
+    fi
+
+    if [ -z "$CODE_SIGN_IDENTITY" ]; then
+        echo -e "${RED}Error: CODE_SIGN_IDENTITY environment variable not set${NC}"
+        echo "Please set CODE_SIGN_IDENTITY or create Config/Local.xcconfig"
+        echo "Example: export CODE_SIGN_IDENTITY='Developer ID Application: Your Name (TEAM_ID)'"
+        exit 1
+    fi
+
+    echo "Building with code signing..."
+    echo "Team ID: $DEVELOPMENT_TEAM"
+    echo "Identity: $CODE_SIGN_IDENTITY"
+
     xcodebuild archive \
         -project "$XCODE_PROJECT" \
         -scheme "$SCHEME" \
@@ -64,8 +92,8 @@ else
         MARKETING_VERSION="$VERSION" \
         CURRENT_PROJECT_VERSION="$VERSION" \
         CODE_SIGN_STYLE=Manual \
-        CODE_SIGN_IDENTITY="Developer ID Application: Clay Software, Inc. (C68GA48KN3)" \
-        DEVELOPMENT_TEAM="C68GA48KN3" \
+        CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
+        DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
         ENABLE_HARDENED_RUNTIME=YES \
         LD_RUNPATH_SEARCH_PATHS="@executable_path/../Frameworks" \
         -allowProvisioningUpdates
@@ -103,9 +131,9 @@ else
     <key>signingStyle</key>
     <string>manual</string>
     <key>signingCertificate</key>
-    <string>Developer ID Application: Clay Software, Inc. (C68GA48KN3)</string>
+    <string>$CODE_SIGN_IDENTITY</string>
     <key>teamID</key>
-    <string>C68GA48KN3</string>
+    <string>$DEVELOPMENT_TEAM</string>
     <key>uploadSymbols</key>
     <true/>
     <key>compileBitcode</key>

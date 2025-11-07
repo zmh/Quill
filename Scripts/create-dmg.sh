@@ -108,11 +108,16 @@ hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH"
 
 # Sign the DMG (required for notarization)
 if [ "$SKIP_CODESIGN" != "true" ]; then
-    echo -e "${BLUE}→${NC} Signing DMG..."
-    codesign --sign "Developer ID Application: Clay Software, Inc. (C68GA48KN3)" \
-        --timestamp \
-        --options runtime \
-        "$DMG_PATH"
+    if [ -z "$CODE_SIGN_IDENTITY" ]; then
+        echo -e "${YELLOW}Warning: CODE_SIGN_IDENTITY not set, skipping DMG signing${NC}"
+        echo "Set CODE_SIGN_IDENTITY environment variable to sign the DMG"
+    else
+        echo -e "${BLUE}→${NC} Signing DMG with: $CODE_SIGN_IDENTITY"
+        codesign --sign "$CODE_SIGN_IDENTITY" \
+            --timestamp \
+            --options runtime \
+            "$DMG_PATH"
+    fi
 fi
 
 # Clean up
