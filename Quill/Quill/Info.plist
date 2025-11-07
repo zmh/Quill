@@ -34,9 +34,14 @@
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 
+	<!-- Allow unsigned updates for GitHub releases -->
+	<!-- Remove this key when you add EdDSA signatures in production -->
+	<key>SUAllowsInsecureUpdates</key>
+	<true/>
+
 	<!-- EdDSA Public Key (Optional - for signed updates in production) -->
 	<!-- Generate with: sparkle/bin/generate_keys -->
-	<!-- Uncomment when you have generated signing keys -->
+	<!-- Uncomment when you have generated signing keys and remove SUAllowsInsecureUpdates -->
 	<!--
 	<key>SUPublicEDKey</key>
 	<string>YOUR_PUBLIC_KEY_HERE</string>
