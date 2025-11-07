@@ -35,9 +35,7 @@
 	<integer>86400</integer>
 
 	<!-- EdDSA Public Key for signed updates -->
-	<!-- Generate with: ./Scripts/generate-sparkle-keys.sh -->
-	<!-- IMPORTANT: Replace this placeholder with your actual public key! -->
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_WITH_YOUR_SPARKLE_PUBLIC_KEY</string>
+	<string>J8CMVJtgpoUqbitsNR/rykxgUpTPOVAcSeWZ5LV7YOc=</string>
 </dict>
 </plist>
