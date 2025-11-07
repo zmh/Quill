@@ -19,6 +19,30 @@
         -->
 
         <item>
+            <title>Version 1.0.4</title>
+            <pubDate>Thu, 07 Nov 2025 17:57:45 +0000</pubDate>
+            <sparkle:version>1.0.4</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.4</h2>
+                <ul>
+                    <li><strong>Security:</strong> Removed hardcoded developer credentials from repository</li>
+                    <li><strong>Security:</strong> Build system now uses environment variables for signing</li>
+                    <li><strong>Developer:</strong> Added comprehensive developer setup documentation</li>
+                    <li><strong>Build:</strong> Repository is now safe for public sharing</li>
+                    <li>GitHub Actions continues to build unsigned releases automatically</li>
+                </ul>
+                <p>This is a security-focused release that removes sensitive developer credentials from the codebase while maintaining full functionality.</p>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/quill/releases/download/v1.0.4/Quill-1.0.4.dmg"
+                length="3517312"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.3</title>
             <pubDate>Mon, 04 Nov 2025 17:00:00 +0000</pubDate>
             <sparkle:version>1.0.3</sparkle:version>
