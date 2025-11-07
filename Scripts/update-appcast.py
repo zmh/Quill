@@ -4,10 +4,11 @@ update-appcast.py
 Automatically updates appcast.xml with a new release entry.
 
 Usage:
-    ./Scripts/update-appcast.py <version> <dmg_size> <release_notes_file>
+    ./Scripts/update-appcast.py <version> <dmg_size> <release_notes_file> [ed_signature]
 
 Example:
     ./Scripts/update-appcast.py 1.0.5 3517446 release_notes.md
+    ./Scripts/update-appcast.py 1.0.5 3517446 release_notes.md "MEUCIQDxA..."
 """
 
 import sys
@@ -41,13 +42,16 @@ def parse_release_notes(release_notes_file):
 
     return notes[:5] if notes else ["See the full release notes for details."]
 
-def create_item_xml(version, dmg_size, release_notes, repo="zmh/quill"):
+def create_item_xml(version, dmg_size, release_notes, repo="zmh/quill", ed_signature=None):
     """Create a new <item> XML string for the appcast."""
     # Publication date (RFC 822 format)
     pub_date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
 
     # Format release notes as HTML list items
     notes_html = '\n'.join([f'                    <li>{note}</li>' for note in release_notes])
+
+    # Add EdDSA signature if provided
+    signature_attr = f'\n                sparkle:edSignature="{ed_signature}"' if ed_signature else ''
 
     # Build the XML string manually to match the existing format exactly
     item_xml = f"""        <item>
@@ -65,14 +69,14 @@ def create_item_xml(version, dmg_size, release_notes, repo="zmh/quill"):
             <enclosure
                 url="https://github.com/{repo}/releases/download/v{version}/Quill-{version}.dmg"
                 length="{dmg_size}"
-                type="application/octet-stream"
+                type="application/octet-stream"{signature_attr}
             />
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
         </item>"""
 
     return item_xml
 
-def update_appcast(appcast_file, version, dmg_size, release_notes_file, repo="zmh/quill"):
+def update_appcast(appcast_file, version, dmg_size, release_notes_file, repo="zmh/quill", ed_signature=None):
     """Update the appcast.xml file with a new release."""
     # Read the file content
     with open(appcast_file, 'r') as f:
@@ -82,7 +86,7 @@ def update_appcast(appcast_file, version, dmg_size, release_notes_file, repo="zm
     release_notes = parse_release_notes(release_notes_file)
 
     # Create new item XML (as a formatted string)
-    new_item_xml = create_item_xml(version, dmg_size, release_notes, repo)
+    new_item_xml = create_item_xml(version, dmg_size, release_notes, repo, ed_signature)
 
     # Find the insertion point (after the comment block, before first existing item)
     # Look for the end of the comment block (-->)
@@ -111,13 +115,15 @@ def update_appcast(appcast_file, version, dmg_size, release_notes_file, repo="zm
 
 def main():
     if len(sys.argv) < 4:
-        print("Usage: ./Scripts/update-appcast.py <version> <dmg_size> <release_notes_file>")
+        print("Usage: ./Scripts/update-appcast.py <version> <dmg_size> <release_notes_file> [ed_signature]")
         print("Example: ./Scripts/update-appcast.py 1.0.5 3517446 release_notes.md")
+        print("         ./Scripts/update-appcast.py 1.0.5 3517446 release_notes.md \"MEUCIQDxA...\"")
         sys.exit(1)
 
     version = sys.argv[1]
     dmg_size = sys.argv[2]
     release_notes_file = sys.argv[3]
+    ed_signature = sys.argv[4] if len(sys.argv) > 4 else None
 
     # Default paths
     appcast_file = 'appcast.xml'
@@ -129,7 +135,7 @@ def main():
         print(f"✗ Appcast file not found: {appcast_file}")
         sys.exit(1)
 
-    success = update_appcast(appcast_file, version, dmg_size, release_notes_file, repo)
+    success = update_appcast(appcast_file, version, dmg_size, release_notes_file, repo, ed_signature)
     sys.exit(0 if success else 1)
 
 if __name__ == '__main__':

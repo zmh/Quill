@@ -23,6 +23,34 @@ jobs:
         with:
           xcode-version: '16.1'  # Project format 77 requires Xcode 16+
 
+      - name: Import Code Signing Certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo "$CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security import "$CERTIFICATE_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+
+          # Set keychain as default
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Clean up certificate file
+          rm "$CERTIFICATE_PATH"
+
+          echo "Certificate imported successfully"
+
       - name: Extract version from tag
         id: version
         run: |
@@ -32,14 +60,15 @@ jobs:
 
       - name: Build Release
         env:
-          SKIP_CODESIGN: "true"  # Build unsigned for GitHub distribution
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          CODE_SIGN_IDENTITY: "Developer ID Application"
         run: |
           chmod +x Scripts/build-release.sh
           ./Scripts/build-release.sh ${{ steps.version.outputs.version }}
 
       - name: Create DMG
         env:
-          SKIP_CODESIGN: "true"  # Skip DMG signing in CI (app bundle is already signed)
+          CODE_SIGN_IDENTITY: "Developer ID Application"
         run: |
           chmod +x Scripts/create-dmg.sh
           ./Scripts/create-dmg.sh ${{ steps.version.outputs.version }}
@@ -135,6 +164,44 @@ jobs:
           name: appcast
           path: build/appcast/appcast.xml
 
+      - name: Sign DMG with Sparkle EdDSA
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_PATH="build/Quill-${VERSION}.dmg"
+
+          # Download Sparkle tools for signing
+          SPARKLE_VERSION="2.6.4"
+          SPARKLE_URL="https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+
+          echo "Downloading Sparkle tools..."
+          curl -L -o "$RUNNER_TEMP/sparkle.tar.xz" "$SPARKLE_URL"
+          tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP"
+
+          SIGN_UPDATE="$RUNNER_TEMP/bin/sign_update"
+
+          if [ ! -f "$SIGN_UPDATE" ]; then
+            echo "Error: sign_update tool not found"
+            ls -la "$RUNNER_TEMP/bin/" || echo "bin directory not found"
+            exit 1
+          fi
+
+          # Write private key to temporary file
+          PRIVATE_KEY_PATH="$RUNNER_TEMP/sparkle_private_key"
+          echo "$SPARKLE_PRIVATE_KEY" > "$PRIVATE_KEY_PATH"
+
+          # Sign the DMG and capture the signature
+          SIGNATURE=$("$SIGN_UPDATE" "$DMG_PATH" "$PRIVATE_KEY_PATH")
+
+          # Save signature to file for next step
+          echo "$SIGNATURE" > build/dmg_signature.txt
+          echo "EdDSA Signature: $SIGNATURE"
+
+          # Clean up private key and tools
+          rm "$PRIVATE_KEY_PATH"
+          rm -rf "$RUNNER_TEMP/sparkle.tar.xz"
+
       - name: Update Appcast in Repository
         run: |
           # Configure git
@@ -148,12 +215,13 @@ jobs:
           # Get release info
           VERSION="${{ steps.version.outputs.version }}"
           DMG_SIZE=$(stat -f%z "build/Quill-${VERSION}.dmg")
+          ED_SIGNATURE=$(cat build/dmg_signature.txt)
 
           # Make script executable
           chmod +x Scripts/update-appcast.py
 
-          # Update appcast.xml using the Python script
-          python3 Scripts/update-appcast.py "$VERSION" "$DMG_SIZE" "release_notes.md"
+          # Update appcast.xml using the Python script with EdDSA signature
+          python3 Scripts/update-appcast.py "$VERSION" "$DMG_SIZE" "release_notes.md" "$ED_SIGNATURE"
 
           # Commit and push if there are changes
           if git diff --quiet appcast.xml; then
