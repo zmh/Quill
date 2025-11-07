@@ -19,6 +19,28 @@
         -->
 
         <item>
+            <title>Version 1.0.5</title>
+            <pubDate>Thu, 07 Nov 2025 19:49:39 +0000</pubDate>
+            <sparkle:version>1.0.5</sparkle:version>
+            <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.5</h2>
+                <ul>
+                    <li><strong>Fix:</strong> Sparkle update signature verification now works with unsigned releases</li>
+                    <li><strong>Fix:</strong> Users can now auto-update without "improperly signed" errors</li>
+                    <li>Resolves update installation issues for GitHub-distributed releases</li>
+                </ul>
+                <p><strong>Important:</strong> If you're on v1.0.3 or v1.0.4, please manually download v1.0.5 to fix auto-updates. Future updates will work automatically.</p>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/quill/releases/download/v1.0.5/Quill-1.0.5.dmg"
+                length="3517446"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.4</title>
             <pubDate>Thu, 07 Nov 2025 17:57:45 +0000</pubDate>
             <sparkle:version>1.0.4</sparkle:version>
