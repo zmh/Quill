@@ -19,6 +19,30 @@
         -->
 
         <item>
+            <title>Version 1.0.9</title>
+            <pubDate>Fri, 07 Nov 2025 21:57:25 +0000</pubDate>
+            <sparkle:version>1.0.9</sparkle:version>
+            <sparkle:shortVersionString>1.0.9</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.9</h2>
+                <ul>
+                    <li>Temporarily disable EdDSA signing to test Apple code signing</li>
+                    <li>Fix Sparkle sign_update tool path in release workflow</li>
+                    <li>Add Sparkle EdDSA public key to Info.plist</li>
+                    <li>Add proper code signing and Sparkle EdDSA signatures to releases</li>
+                    <li>Update appcast.xml for v1.0.7 [skip ci]</li>
+                </ul>
+                <p>See the <a href="https://github.com/zmh/Quill/releases/tag/v1.0.9">full release notes</a> for details.</p>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/Quill/releases/download/v1.0.9/Quill-1.0.9.dmg"
+                length="3596552"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.8</title>
             <pubDate>Fri, 07 Nov 2025 21:53:27 +0000</pubDate>
             <sparkle:version>1.0.8</sparkle:version>
