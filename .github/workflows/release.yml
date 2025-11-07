@@ -162,7 +162,7 @@ jobs:
             git add appcast.xml
             git commit -m "Update appcast.xml for v${VERSION} [skip ci]"
             git push origin main
-            echo "✓ Appcast updated and pushed to main branch"
+            echo "Appcast updated and pushed to main branch"
           fi
 
   notify:
