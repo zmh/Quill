@@ -261,8 +261,13 @@ jobs:
           # Install PyNaCl for Ed25519 signing
           pip3 install pynacl --quiet
 
-          # Sign using inline Python (single line to avoid YAML issues)
-          SIGNATURE=$(python3 -c "import base64,os,nacl.signing;k=base64.b64decode(os.environ['SPARKLE_PRIVATE_KEY']);d=open('$DMG_PATH','rb').read();print(base64.b64encode(nacl.signing.SigningKey(k[:32]).sign(d).signature).decode())")
+          # Create signing script
+          echo 'import base64,os,sys,nacl.signing' > /tmp/sign.py
+          echo 'k=base64.b64decode(os.environ["SPARKLE_PRIVATE_KEY"])' >> /tmp/sign.py
+          echo 'd=open(sys.argv[1],"rb").read()' >> /tmp/sign.py
+          echo 'print(base64.b64encode(nacl.signing.SigningKey(k[:32]).sign(d).signature).decode())' >> /tmp/sign.py
+
+          SIGNATURE=$(python3 /tmp/sign.py "$DMG_PATH")
 
           if [ -n "$SIGNATURE" ]; then
             echo "✓ DMG signed with EdDSA"
