@@ -19,6 +19,29 @@
         -->
 
         <item>
+            <title>Version 1.0.11</title>
+            <pubDate>Tue, 16 Dec 2025 23:17:19 +0000</pubDate>
+            <sparkle:version>1.0.11</sparkle:version>
+            <sparkle:shortVersionString>1.0.11</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.11</h2>
+                <ul>
+                    <li>Add author credit to About menu</li>
+                    <li>Add macOS notarization to release workflow</li>
+                    <li>Update appcast.xml for v1.0.9 [skip ci]</li>
+                    <li>Update appcast.xml for v1.0.8 [skip ci]</li>
+                </ul>
+                <p>See the <a href="https://github.com/zmh/Quill/releases/tag/v1.0.11">full release notes</a> for details.</p>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/Quill/releases/download/v1.0.11/Quill-1.0.11.dmg"
+                length="3598652"
+                type="application/octet-stream"
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.9</title>
             <pubDate>Fri, 07 Nov 2025 21:57:25 +0000</pubDate>
             <sparkle:version>1.0.9</sparkle:version>
