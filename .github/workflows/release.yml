@@ -85,7 +85,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           DMG_PATH="build/Quill-${VERSION}.dmg"
 
-          echo "Submitting DMG for notarization..."
+          echo "Checking notarization credentials..."
 
           # Check which authentication method is available
           if [ -n "$APPLE_API_KEY_CONTENT" ] && [ -n "$APPLE_API_KEY_ID" ] && [ -n "$APPLE_API_ISSUER_ID" ]; then
@@ -107,6 +107,16 @@ jobs:
             # Clean up API key
             rm "$API_KEY_PATH"
 
+            echo "Notarization complete! Stapling ticket to DMG..."
+
+            # Staple the notarization ticket
+            xcrun stapler staple "$DMG_PATH"
+
+            # Verify stapling
+            xcrun stapler validate "$DMG_PATH"
+
+            echo "DMG successfully notarized and stapled!"
+
           elif [ -n "$APPLE_ID" ] && [ -n "$APPLE_ID_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
             # Use Apple ID + app-specific password
             echo "Using Apple ID authentication"
@@ -118,23 +128,24 @@ jobs:
               --wait \
               --timeout 15m
 
+            echo "Notarization complete! Stapling ticket to DMG..."
+
+            # Staple the notarization ticket
+            xcrun stapler staple "$DMG_PATH"
+
+            # Verify stapling
+            xcrun stapler validate "$DMG_PATH"
+
+            echo "DMG successfully notarized and stapled!"
+
           else
-            echo "Error: No notarization credentials found"
-            echo "Please set either:"
+            echo "⚠️ Warning: No notarization credentials found - skipping notarization"
+            echo "The DMG will be unsigned. To enable notarization, set either:"
             echo "  - APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_CONTENT (recommended)"
             echo "  - APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID"
-            exit 1
+            echo ""
+            echo "Continuing with unsigned release for testing..."
           fi
-
-          echo "Notarization complete! Stapling ticket to DMG..."
-
-          # Staple the notarization ticket
-          xcrun stapler staple "$DMG_PATH"
-
-          # Verify stapling
-          xcrun stapler validate "$DMG_PATH"
-
-          echo "DMG successfully notarized and stapled!"
 
       - name: Generate Release Notes
         id: release_notes
@@ -167,12 +178,18 @@ jobs:
           cat build/Quill-${{ steps.version.outputs.version }}.dmg.sha256 >> release_notes.md
           echo "\`\`\`" >> release_notes.md
 
+      - name: Create stable download link
+        run: |
+          # Copy versioned DMG to a stable name for consistent download URL
+          cp "build/Quill-${{ steps.version.outputs.version }}.dmg" "build/Quill.dmg"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             build/Quill-${{ steps.version.outputs.version }}.dmg
             build/Quill-${{ steps.version.outputs.version }}.dmg.sha256
+            build/Quill.dmg
           body_path: release_notes.md
           draft: false
           prerelease: false

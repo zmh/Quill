@@ -8,7 +8,7 @@
 
 **A beautiful, distraction-free WordPress editor for Mac**
 
-[Download Latest Release (v1.0.2)](https://github.com/zmh/Quill/releases/latest) • [View All Releases](https://github.com/zmh/Quill/releases)
+[Download Latest Release](https://github.com/zmh/Quill/releases/latest/download/Quill.dmg) • [View All Releases](https://github.com/zmh/Quill/releases)
 
 ![Platform](https://img.shields.io/badge/Platform-macOS%2015.5%2B-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
@@ -33,7 +33,7 @@ Quill is a native Mac app that lets you write and publish WordPress blog posts o
 
 ### Download (Recommended)
 
-**[→ Download Quill v1.0.2](https://github.com/zmh/Quill/releases/latest)**
+**[→ Download Quill](https://github.com/zmh/Quill/releases/latest/download/Quill.dmg)**
 
 1. Download the latest `.dmg` from the [Releases page](https://github.com/zmh/Quill/releases)
 2. Open the `.dmg` and drag Quill to your Applications folder

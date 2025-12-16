@@ -1074,6 +1074,11 @@ struct SiteURLTextField: UIViewRepresentable {
 // MARK: - About Settings View
 
 struct AboutSettingsView: View {
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        return "Version \(version)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("About Quill")
@@ -1081,13 +1086,21 @@ struct AboutSettingsView: View {
                 .fontWeight(.semibold)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Version 1.0.3")
+                Text(appVersion)
                     .foregroundColor(.secondary)
 
-                Text("A beautiful, native, distraction-free WordPress editor for Mac")
+                Text("A beautiful, native, distraction-free WordPress editor for Mac.")
                     .foregroundColor(.secondary)
 
-                Text("Independent project, not affiliated with WordPress or Automattic")
+                HStack(spacing: 0) {
+                    Text("A side project by ")
+                        .foregroundColor(.secondary)
+                    Link("Zachary Hamed", destination: URL(string: "https://zmh.org")!)
+                    Text(".")
+                        .foregroundColor(.secondary)
+                }
+
+                Text("Independent project, not affiliated with WordPress or Automattic.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.top, 4)
