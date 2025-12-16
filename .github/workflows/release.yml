@@ -259,7 +259,7 @@ jobs:
           fi
 
           # Install PyNaCl for Ed25519 signing
-          pip3 install pynacl --quiet
+          pip3 install pynacl --quiet --break-system-packages
 
           # Sign using dedicated script
           chmod +x Scripts/sign-update.py
