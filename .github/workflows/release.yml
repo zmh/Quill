@@ -258,75 +258,18 @@ jobs:
             exit 0
           fi
 
-          # Install signify for Ed25519 signing (Sparkle uses Ed25519)
-          # The private key from generate_keys is base64-encoded Ed25519 private key
-          pip3 install pure25519 > /dev/null 2>&1
+          # Install PyNaCl for Ed25519 signing
+          pip3 install pynacl --quiet
 
-          # Create signing script
-          cat > /tmp/sign_sparkle.py << 'SIGNEOF'
-          import sys
-          import base64
-          import hashlib
-
-          try:
-              from pure25519 import eddsa
-          except ImportError:
-              # Fallback: try nacl
-              try:
-                  import nacl.signing
-                  import nacl.encoding
-
-                  private_key_b64 = sys.argv[1]
-                  file_path = sys.argv[2]
-
-                  # Decode the private key (Sparkle format: base64 of 64-byte seed+pubkey or 32-byte seed)
-                  key_bytes = base64.b64decode(private_key_b64)
-
-                  # Read file
-                  with open(file_path, 'rb') as f:
-                      data = f.read()
-
-                  # Sign
-                  if len(key_bytes) == 64:
-                      # Full key (seed + public key)
-                      signing_key = nacl.signing.SigningKey(key_bytes[:32])
-                  else:
-                      signing_key = nacl.signing.SigningKey(key_bytes)
-
-                  signed = signing_key.sign(data)
-                  signature = base64.b64encode(signed.signature).decode('utf-8')
-                  print(signature)
-                  sys.exit(0)
-              except ImportError:
-                  print("Error: Neither pure25519 nor nacl available", file=sys.stderr)
-                  sys.exit(1)
-
-          private_key_b64 = sys.argv[1]
-          file_path = sys.argv[2]
-
-          # Decode the private key
-          key_bytes = base64.b64decode(private_key_b64)
-
-          # Read file
-          with open(file_path, 'rb') as f:
-              data = f.read()
-
-          # Sign using pure25519
-          if len(key_bytes) == 64:
-              seed = key_bytes[:32]
-          else:
-              seed = key_bytes
-
-          signing_key, verifying_key = eddsa.create_signing_keypair(seed)
-          signature_bytes = eddsa.sign(signing_key, data)
-          signature = base64.b64encode(signature_bytes[:64]).decode('utf-8')
-          print(signature)
-          SIGNEOF
-
-          # Try PyNaCl first (more reliable)
-          pip3 install pynacl > /dev/null 2>&1
-
-          SIGNATURE=$(python3 /tmp/sign_sparkle.py "$SPARKLE_PRIVATE_KEY" "$DMG_PATH" 2>/dev/null || echo "")
+          # Sign using inline Python
+          SIGNATURE=$(python3 -c "
+import sys, base64, os
+import nacl.signing
+key = base64.b64decode(os.environ['SPARKLE_PRIVATE_KEY'])
+with open('$DMG_PATH', 'rb') as f: data = f.read()
+sig = nacl.signing.SigningKey(key[:32]).sign(data).signature
+print(base64.b64encode(sig).decode())
+")
 
           if [ -n "$SIGNATURE" ]; then
             echo "✓ DMG signed with EdDSA"
