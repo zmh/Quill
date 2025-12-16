@@ -19,6 +19,31 @@
         -->
 
         <item>
+            <title>Version 1.0.14</title>
+            <pubDate>Tue, 16 Dec 2025 23:53:57 +0000</pubDate>
+            <sparkle:version>1.0.14</sparkle:version>
+            <sparkle:shortVersionString>1.0.14</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.14</h2>
+                <ul>
+                    <li>Fix pip install on macOS GitHub runner</li>
+                    <li>Add dedicated EdDSA signing script</li>
+                    <li>Fix EdDSA signing by writing script to file</li>
+                    <li>Fix YAML syntax in EdDSA signing step</li>
+                    <li>Fix EdDSA signing script indentation</li>
+                </ul>
+                <p>See the <a href="https://github.com/zmh/Quill/releases/tag/v1.0.14">full release notes</a> for details.</p>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/Quill/releases/download/v1.0.14/Quill-1.0.14.dmg"
+                length="3600394"
+                type="application/octet-stream"
+                sparkle:edSignature="R1wuYlWFv7fzeuFmIlnJAIVqABMRjy+EO8+EMARCo5BZSEklR4f47sK7oqU5BW3a7eCiHgk51e5llt5NejsvAA=="
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.12</title>
             <pubDate>Tue, 16 Dec 2025 23:30:00 +0000</pubDate>
             <sparkle:version>1.0.12</sparkle:version>
