@@ -26,6 +26,10 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 
+	<!-- Copyright / Credits -->
+	<key>NSHumanReadableCopyright</key>
+	<string>Created by Zachary Hamed</string>
+
 	<!-- Sparkle Update Configuration -->
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/zmh/quill/main/appcast.xml</string>
