@@ -1347,17 +1347,23 @@ struct PostMetadataView: View {
               let remoteID = post.remoteID else { return }
 
         // Use the permalink from WordPress if available, otherwise construct preview URL
+        // Always add preview=true parameter for WordPress to show unpublished content
         let previewURL: String
         if let permalink = post.permalink {
-            previewURL = permalink
+            // Append preview parameter to permalink
+            if permalink.contains("?") {
+                previewURL = "\(permalink)&preview=true"
+            } else {
+                previewURL = "\(permalink)?preview=true"
+            }
         } else {
-            // Fallback: Extract base domain and use ?p={postID} format
+            // Fallback: Extract base domain and use ?p={postID}&preview=true format
             guard let url = URL(string: siteConfig.siteURL),
                   let scheme = url.scheme,
                   let host = url.host else { return }
 
             let baseURL = "\(scheme)://\(host)"
-            previewURL = "\(baseURL)/?p=\(remoteID)"
+            previewURL = "\(baseURL)/?p=\(remoteID)&preview=true"
         }
 
         #if os(macOS)
