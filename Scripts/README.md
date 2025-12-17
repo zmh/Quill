@@ -100,11 +100,10 @@ rm -rf build/
 
 ### Team ID
 
-The scripts use team ID `86G95Q55DC`. To change this:
+The scripts use environment variables for team ID. To configure:
 
-1. Open `build-release.sh`
-2. Find `DEVELOPMENT_TEAM="86G95Q55DC"`
-3. Replace with your team ID
+1. Set your team ID: `export DEVELOPMENT_TEAM="YOUR_TEAM_ID"`
+2. Or create `Config/Local.xcconfig` with your credentials
 
 Find your team ID:
 - Xcode → Settings → Accounts → [Your Account] → Team ID
@@ -221,6 +220,6 @@ VERSION=$(git describe --tags --always)
 
 ## See Also
 
-- [DISTRIBUTION_SETUP.md](../DISTRIBUTION_SETUP.md) - Initial setup guide
-- [RELEASE.md](../RELEASE.md) - Complete release process
+- [DISTRIBUTION_SETUP.md](../docs/DISTRIBUTION_SETUP.md) - Initial setup guide
+- [RELEASE.md](../docs/RELEASE.md) - Complete release process
 - [.github/workflows/release.yml](../.github/workflows/release.yml) - CI/CD workflow

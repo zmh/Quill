@@ -56,7 +56,7 @@ shasum -a 256 -c Quill-[VERSION].dmg.sha256
 
 ## Troubleshooting
 
-See [INSTALLATION.md](https://github.com/YOUR_USERNAME/quill/blob/main/INSTALLATION.md) for installation help.
+See [INSTALLATION.md](https://github.com/zmh/Quill/blob/main/docs/INSTALLATION.md) for installation help.
 
 ---
 

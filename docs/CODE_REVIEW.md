@@ -7,9 +7,9 @@ This PR removes all hardcoded Apple Developer Team IDs and signing identities fr
 
 ### Credentials Removed
 - ✅ **8 instances** of hardcoded `DEVELOPMENT_TEAM` removed from `project.pbxproj`
-  - Removed: `2LPS95N95U`, `86G95Q55DC`
+  - Removed: `XXXXXXXXXX`, `XXXXXXXXXX`
 - ✅ **2 instances** of hardcoded signing identity removed from build scripts
-  - Removed: `C68GA48KN3` (Clay Software, Inc.)
+  - Removed: `XXXXXXXXXX` (Clay Software, Inc.)
 - ✅ All credentials now use environment variables or local config files
 
 ### .gitignore Protection

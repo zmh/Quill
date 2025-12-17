@@ -54,7 +54,7 @@ Add these secrets:
 
 | Secret Name | Value | Description |
 |------------|-------|-------------|
-| `APPLE_TEAM_ID` | Your Apple Team ID (e.g., `2LPS95N95U`) | Find in Apple Developer account |
+| `APPLE_TEAM_ID` | Your Apple Team ID (e.g., `XXXXXXXXXX`) | Find in Apple Developer account |
 | `APPLE_CERTIFICATE_BASE64` | (paste from clipboard in Step 2) | Base64-encoded .p12 certificate |
 | `APPLE_CERTIFICATE_PASSWORD` | Your .p12 password | Password you set when exporting |
 | `SPARKLE_EDDSA_PRIVATE_KEY` | Contents of `sparkle_eddsa_private.key` | Private key for signing updates |

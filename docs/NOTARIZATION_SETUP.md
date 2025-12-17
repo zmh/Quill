@@ -51,7 +51,7 @@ Then paste into the secret field.
 ### Step 3: Configure Your Apple Developer Team ID
 
 You should already have this from the code signing setup:
-- `APPLE_TEAM_ID` = Your 10-character team ID (e.g., `C68GA48KN3`)
+- `APPLE_TEAM_ID` = Your 10-character team ID (e.g., `XXXXXXXXXX`)
 
 ### Step 4: Test Notarization
 
