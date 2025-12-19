@@ -30,6 +30,12 @@ final class AppUpdater: ObservableObject {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+
+        // Check for updates silently on app launch
+        // Only shows UI if an update is available
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.updaterController.updater.checkForUpdatesInBackground()
+        }
     }
 
     /// Check for updates manually
