@@ -28,7 +28,9 @@
       "Bash(xcrun simctl list:*)",
       "Bash(xcrun simctl uninstall:*)",
       "Bash(plutil:*)",
-      "Bash(xcrun simctl get_app_container:*)"
+      "Bash(xcrun simctl get_app_container:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)"
     ]
   },
   "enableAllProjectMcpServers": false

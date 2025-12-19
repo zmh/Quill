@@ -344,16 +344,28 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     line-height: 1.35;
                 }
                 
-                /* List blocks with improved line spacing */
-                .wp-block-content ul,
-                .wp-block-content ol {
+                /* List blocks - restore native styling with proper spacing */
+                ul.wp-block-content,
+                ol.wp-block-content {
                     margin: 0.2em 0;
+                    padding-left: 1.8em;
                     line-height: 1.75;
+                    list-style-position: outside;
                 }
-                
-                .wp-block-content li {
+
+                ul.wp-block-content {
+                    list-style-type: disc;
+                }
+
+                ol.wp-block-content {
+                    list-style-type: decimal;
+                }
+
+                ul.wp-block-content > li,
+                ol.wp-block-content > li {
                     line-height: 1.75;
                     margin: 0.1em 0;
+                    padding-left: 0.3em;
                 }
                 
                 /* Code blocks with line spacing */
@@ -1676,9 +1688,16 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                                 element.style.fontStyle = 'italic';
                                 break;
                             case 'list':
-                            case 'ordered-list':
-                                element.style.paddingLeft = '1.5em';
+                                element.style.paddingLeft = '1.8em';
                                 element.style.margin = '0.2em 0';
+                                element.style.listStyleType = 'disc';
+                                element.style.listStylePosition = 'outside';
+                                break;
+                            case 'ordered-list':
+                                element.style.paddingLeft = '1.8em';
+                                element.style.margin = '0.2em 0';
+                                element.style.listStyleType = 'decimal';
+                                element.style.listStylePosition = 'outside';
                                 break;
                         }
                     }
@@ -5111,9 +5130,16 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                                 element.style.fontStyle = 'italic';
                                 break;
                             case 'list':
-                            case 'ordered-list':
-                                element.style.paddingLeft = '1.5em';
+                                element.style.paddingLeft = '1.8em';
                                 element.style.margin = '0.2em 0';
+                                element.style.listStyleType = 'disc';
+                                element.style.listStylePosition = 'outside';
+                                break;
+                            case 'ordered-list':
+                                element.style.paddingLeft = '1.8em';
+                                element.style.margin = '0.2em 0';
+                                element.style.listStyleType = 'decimal';
+                                element.style.listStylePosition = 'outside';
                                 break;
                         }
                     }
