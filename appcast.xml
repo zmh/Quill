@@ -19,6 +19,29 @@
         -->
 
         <item>
+            <title>Version 1.0.15</title>
+            <pubDate>Wed, 17 Dec 2025 17:10:34 +0000</pubDate>
+            <sparkle:version>1.0.15</sparkle:version>
+            <sparkle:shortVersionString>1.0.15</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>What's New in 1.0.15</h2>
+                <ul>
+                    <li>Add preview=true parameter to WordPress preview URL</li>
+                    <li>Security cleanup and documentation reorganization</li>
+                    <li>Update appcast.xml for v1.0.14 [skip ci]</li>
+                </ul>
+                <p>See the <a href="https://github.com/zmh/Quill/releases/tag/v1.0.15">full release notes</a> for details.</p>
+            ]]></description>
+            <enclosure
+                url="https://github.com/zmh/Quill/releases/download/v1.0.15/Quill-1.0.15.dmg"
+                length="3600689"
+                type="application/octet-stream"
+                sparkle:edSignature="sKGCHGUU9sC6HmnjN8sFEETV0Cp0b33FvLC2vEzyDe6w+wJh+3+xQpNUHXpyXk6WQ8MeLAmNAOprgCQhOBR7DA=="
+            />
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <item>
             <title>Version 1.0.14</title>
             <pubDate>Tue, 16 Dec 2025 23:53:57 +0000</pubDate>
             <sparkle:version>1.0.14</sparkle:version>
