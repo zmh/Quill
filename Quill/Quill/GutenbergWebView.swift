@@ -1704,20 +1704,41 @@ struct GutenbergWebViewRepresentable: UIViewRepresentable {
                     
                     handleBlockInput(event, block) {
                         const blockIndex = this.getBlockIndex(block.id);
-                        
+
                         // Find the block content element
                         const blockElement = this.findBlockElementFromEvent(event);
                         const contentElement = blockElement ? blockElement.querySelector('.wp-block-content') : null;
-                        
+
                         if (!contentElement) return;
-                        
+
                         const content = contentElement.innerHTML;
-                        
+
                         // Update block content
                         this.blocks[blockIndex].content = content;
 
                         // Handle slash commands
                         const text = contentElement.innerText;
+
+                        // Markdown-style list detection (only for paragraph blocks)
+                        if (block.type === 'paragraph') {
+                            // Detect bulleted list: "* " or "- " at start (with regex for robustness)
+                            const bulletRegex = /^(\\*|-|•)\\s$/;
+                            if (bulletRegex.test(text)) {
+                                this.blocks[blockIndex].type = 'list';
+                                this.blocks[blockIndex].content = '<li></li>';
+                                this.render();
+                                this.focusBlock(blockIndex);
+                                return;
+                            }
+                            // Detect numbered list: "1. " at start
+                            if (/^\\d+\\.\\s$/.test(text)) {
+                                this.blocks[blockIndex].type = 'ordered-list';
+                                this.blocks[blockIndex].content = '<li></li>';
+                                this.render();
+                                this.focusBlock(blockIndex);
+                                return;
+                            }
+                        }
 
                         // Skip slash command processing if we just hid slash commands via backspace
                         // BUT allow it if the text is now "/" (user typed "/" again)
@@ -5146,20 +5167,41 @@ struct GutenbergWebViewRepresentable: NSViewRepresentable {
                     
                     handleBlockInput(event, block) {
                         const blockIndex = this.getBlockIndex(block.id);
-                        
+
                         // Find the block content element
                         const blockElement = this.findBlockElementFromEvent(event);
                         const contentElement = blockElement ? blockElement.querySelector('.wp-block-content') : null;
-                        
+
                         if (!contentElement) return;
-                        
+
                         const content = contentElement.innerHTML;
-                        
+
                         // Update block content
                         this.blocks[blockIndex].content = content;
 
                         // Handle slash commands
                         const text = contentElement.innerText;
+
+                        // Markdown-style list detection (only for paragraph blocks)
+                        if (block.type === 'paragraph') {
+                            // Detect bulleted list: "* " or "- " at start (with regex for robustness)
+                            const bulletRegex = /^(\\*|-|•)\\s$/;
+                            if (bulletRegex.test(text)) {
+                                this.blocks[blockIndex].type = 'list';
+                                this.blocks[blockIndex].content = '<li></li>';
+                                this.render();
+                                this.focusBlock(blockIndex);
+                                return;
+                            }
+                            // Detect numbered list: "1. " at start
+                            if (/^\\d+\\.\\s$/.test(text)) {
+                                this.blocks[blockIndex].type = 'ordered-list';
+                                this.blocks[blockIndex].content = '<li></li>';
+                                this.render();
+                                this.focusBlock(blockIndex);
+                                return;
+                            }
+                        }
 
                         // Skip slash command processing if we just hid slash commands via backspace
                         // BUT allow it if the text is now "/" (user typed "/" again)
